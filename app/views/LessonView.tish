@@ -313,6 +313,72 @@ fn LessonHeader(props) {
   </div>
 }
 
+// Walk the manifest's parts/chapters in order and return the chapters that
+// come before and after `currentChapter` (or null when at an end).
+fn findPrevNext(manifest, currentChapter) {
+  let empty = { prev: null, next: null }
+  if (manifest === null || manifest === undefined) { return empty }
+  if (manifest.state !== "ready") { return empty }
+  let data = manifest.data
+  if (data === null || data === undefined) { return empty }
+  let parts = opt(data, "parts", [])
+  let flat = []
+  let p = 0
+  while (p < parts.length) {
+    let chapters = opt(parts[p], "chapters", [])
+    let i = 0
+    while (i < chapters.length) {
+      let c = chapters[i]
+      let cid = opt(c, "id", "")
+      let ctitle = opt(c, "title", cid)
+      flat.push({ id: cid, title: ctitle })
+      i = i + 1
+    }
+    p = p + 1
+  }
+  let idx = -1
+  let k = 0
+  while (k < flat.length) {
+    if (flat[k].id === currentChapter) { idx = k; break }
+    k = k + 1
+  }
+  if (idx < 0) { return empty }
+  let prev = idx > 0 ? flat[idx - 1] : null
+  let next = idx < flat.length - 1 ? flat[idx + 1] : null
+  return { prev: prev, next: next }
+}
+
+fn PrevNext(props) {
+  let track = props.track
+  let prev = props.prev
+  let next = props.next
+  if (prev === null && next === null) { return null }
+  return <nav class="ll-prev-next">
+    <div class="ll-prev-next-cell">
+      {prev !== null
+        ? <a class="ll-prev-next-link ll-prev-next-prev" href={"/" + track + "/" + prev.id}>
+            <span class="ll-prev-next-arrow">{"←"}</span>
+            <span class="ll-prev-next-stack">
+              <span class="ll-prev-next-label">{"Previous"}</span>
+              <span class="ll-prev-next-title">{prev.title}</span>
+            </span>
+          </a>
+        : null}
+    </div>
+    <div class="ll-prev-next-cell ll-prev-next-cell-right">
+      {next !== null
+        ? <a class="ll-prev-next-link ll-prev-next-next" href={"/" + track + "/" + next.id}>
+            <span class="ll-prev-next-stack ll-prev-next-stack-right">
+              <span class="ll-prev-next-label">{"Next"}</span>
+              <span class="ll-prev-next-title">{next.title}</span>
+            </span>
+            <span class="ll-prev-next-arrow">{"→"}</span>
+          </a>
+        : null}
+    </div>
+  </nav>
+}
+
 export fn LessonView(props) {
   // Pure view: text + parsed AST come from LearnApp via props (data hooks
   // live there to keep the global hookCursor stable across route changes).
@@ -320,6 +386,7 @@ export fn LessonView(props) {
   let chapter = props.chapter
   let res = props.res
   let parsed = props.parsed
+  let manifest = props.manifest
   if (res === null || res === undefined) { res = { state: "idle", text: "", error: "" } }
   if (parsed === null || parsed === undefined) { parsed = [] }
 
@@ -354,8 +421,11 @@ export fn LessonView(props) {
     j = j + 1
   }
 
+  let nav = findPrevNext(manifest, chapter)
+
   return <article class="ll-lesson">
     <LessonHeader track={track} chapter={chapter} frontmatter={frontmatter} />
     <div class="ll-lesson-body">{blocks}</div>
+    <PrevNext track={track} prev={nav.prev} next={nav.next} />
   </article>
 }

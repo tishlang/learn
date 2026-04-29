@@ -15,10 +15,12 @@ TISH_ROOT := env_var_or_default("TISH_ROOT", justfile_directory() + "/../tish")
 default:
     @just --list
 
-# Lattish runtime for the iframe-based JS preview.
+# Iframe runtime for the in-browser sandbox. Bundles Lattish + tish-ide-panels'
+# iframe-shims (serve / fs / fetch / BroadcastChannel) into one flat JS file
+# that gets prepended to compiled lesson code in the srcdoc iframe.
 build-runtime:
     mkdir -p "{{ justfile_directory() }}/public/dist"
-    tish build "{{ justfile_directory() }}/node_modules/lattish/src/Lattish.tish" \
+    tish build "{{ justfile_directory() }}/node_modules/tish-ide-panels/src/iframe-runtime.tish" \
         -o "{{ justfile_directory() }}/public/dist/lattish-runtime.js" \
         --target js
 

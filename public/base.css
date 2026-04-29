@@ -169,6 +169,69 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   border-color: color-mix(in oklch, var(--error) 50%, transparent);
 }
 
+/* Prev/next chapter footer (mirrors tishlang.com /docs nav) */
+.ll-prev-next {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.ll-prev-next-cell { flex: 1; min-width: 0; display: flex; }
+.ll-prev-next-cell-right { justify-content: flex-end; }
+.ll-prev-next-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  max-width: 100%;
+  min-width: 0;
+}
+.ll-prev-next-link:hover {
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 8%, var(--surface));
+}
+.ll-prev-next-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.ll-prev-next-stack-right { text-align: right; align-items: flex-end; }
+.ll-prev-next-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.ll-prev-next-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ll-prev-next-arrow {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.15s, transform 0.15s;
+}
+.ll-prev-next-link:hover .ll-prev-next-arrow {
+  color: var(--primary);
+}
+.ll-prev-next-prev:hover .ll-prev-next-arrow { transform: translateX(-2px); }
+.ll-prev-next-next:hover .ll-prev-next-arrow { transform: translateX(2px); }
+
 .ll-lesson-body h1, .ll-lesson-body h2, .ll-lesson-body h3 { letter-spacing: -0.015em; margin-top: 2rem; }
 .ll-lesson-body h1 { font-size: 1.75rem; }
 .ll-lesson-body h2 { font-size: 1.35rem; }
@@ -268,7 +331,19 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 /* MiniRunner */
 .mr-root { display: flex; flex-direction: column; gap: 0.5rem; margin: 1.25rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.mr-editor { height: 180px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.mr-editor {
+  height: clamp(180px, 32vh, 360px);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
+  /* Become a flex column so the .pg-editor inside actually fills, instead of
+     collapsing to its intrinsic content height in a block container. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.mr-editor > * { min-height: 0; }
 .mr-controls { display: flex; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
 .mr-run { padding: 0.4rem 1.1rem; border: none; background: var(--primary); color: oklch(0.11 0 0); border-radius: 6px; font-weight: 600; font-size: 0.85rem; }
 .mr-run:hover { filter: brightness(1.1); }
@@ -431,13 +506,106 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 .dir-sandbox-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
 .dir-sandbox-badge { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
 .dir-sandbox-run { padding: 0.4rem 1rem; border: none; background: var(--primary); color: oklch(0.11 0 0); border-radius: 6px; font-weight: 600; font-size: 0.85rem; }
-.dir-sandbox-body { display: flex; flex-direction: column; min-height: 380px; }
-.dir-sandbox-editor { flex: 1; min-height: 220px; }
-.dir-sandbox-terminal { height: 140px; border-top: 1px solid var(--border); }
-.dir-sandbox-ide .dir-sandbox-body { flex-direction: row; min-height: 480px; }
-.dir-sandbox-ide .dir-sandbox-left { flex: 1; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
-.dir-sandbox-ide .dir-sandbox-right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dir-sandbox-ide .dir-sandbox-preview { flex: 1; min-height: 0; }
+
+/* Definite heights + CSS-variable-driven splits so panes are draggable
+   without triggering Lattish re-renders. --sb-left/--sb-term are written
+   directly to the body element by Sandbox.tish during the drag. */
+.dir-sandbox-body {
+  display: flex;
+  flex-direction: column;
+  height: clamp(360px, 55vh, 560px);
+  min-height: 0;
+  --sb-left: 50;
+  --sb-term: 35;
+}
+
+/* All pane wrappers must be flex columns with min-height: 0 so the inner
+   .pg-editor / .pg-terminal / .pg-preview can fill them via `flex: 1`.
+   A plain block wrapper would let those panels collapse to content height. */
+.dir-sandbox-editor,
+.dir-sandbox-terminal,
+.dir-sandbox-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.dir-sandbox-editor > *,
+.dir-sandbox-terminal > *,
+.dir-sandbox-preview > * { min-height: 0; min-width: 0; }
+
+/* Console mode: editor on top, draggable horizontal handle, terminal below. */
+.dir-sandbox-console .dir-sandbox-editor { flex: 1; }
+.dir-sandbox-console .dir-sandbox-terminal {
+  flex: 0 0 auto;
+  height: calc(var(--sb-term) * 1%);
+  min-height: 80px;
+  border-top: 1px solid var(--border);
+}
+
+/* IDE mode: editor (left) | preview + terminal (right). */
+.dir-sandbox-ide .dir-sandbox-body {
+  flex-direction: row;
+  height: clamp(440px, 65vh, 680px);
+}
+.dir-sandbox-ide .dir-sandbox-left {
+  flex: 0 0 auto;
+  width: calc(var(--sb-left) * 1%);
+  min-width: 200px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dir-sandbox-ide .dir-sandbox-right {
+  flex: 1;
+  min-width: 200px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dir-sandbox-ide .dir-sandbox-editor { flex: 1; }
+.dir-sandbox-ide .dir-sandbox-preview { flex: 1; }
+.dir-sandbox-ide .dir-sandbox-terminal {
+  flex: 0 0 auto;
+  height: calc(var(--sb-term) * 1%);
+  min-height: 80px;
+}
+
+/* Resize handles. Thin invisible strips that highlight on hover, lit up
+   while dragging via the dir-sandbox-resizing-* class on <body>. */
+.dir-sandbox-resize-v,
+.dir-sandbox-resize-h {
+  flex: 0 0 auto;
+  background: var(--border);
+  transition: background 0.15s;
+  position: relative;
+  z-index: 5;
+}
+.dir-sandbox-resize-v {
+  width: 6px;
+  cursor: col-resize;
+}
+.dir-sandbox-resize-h {
+  height: 6px;
+  cursor: row-resize;
+}
+.dir-sandbox-resize-v:hover,
+.dir-sandbox-resize-h:hover,
+.dir-sandbox-resizing-v .dir-sandbox-resize-v,
+.dir-sandbox-resizing-h .dir-sandbox-resize-h {
+  background: var(--primary);
+}
+/* Keep the cursor consistent across the page during a drag, and prevent
+   accidental text selection / iframe interaction. */
+.dir-sandbox-resizing-v,
+.dir-sandbox-resizing-v * { cursor: col-resize !important; user-select: none !important; }
+.dir-sandbox-resizing-h,
+.dir-sandbox-resizing-h * { cursor: row-resize !important; user-select: none !important; }
+.dir-sandbox-resizing-v iframe,
+.dir-sandbox-resizing-h iframe { pointer-events: none; }
 
 /* Directives: Project */
 .dir-project { margin: 0.5rem 0 2rem 0; padding: 1.5rem; background: linear-gradient(135deg, var(--primary-soft), var(--surface)); border: 1px solid var(--primary); border-radius: 12px; }

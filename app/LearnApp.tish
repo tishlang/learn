@@ -255,7 +255,7 @@ export fn LearnApp() {
     main = <TrackPicker tracks={TRACKS} focusedTrack={route.track} manifest={manifest} />
   } else {
     let lessonKey = (route.track !== null ? route.track : "") + "/" + (route.chapter !== null ? route.chapter : "")
-    main = <LessonView key={lessonKey} track={route.track} chapter={route.chapter} res={chapterRes} parsed={parsed} />
+    main = <LessonView key={lessonKey} track={route.track} chapter={route.chapter} res={chapterRes} parsed={parsed} manifest={manifest} />
   }
 
   let showSidebar = route.view === "chapter" || route.view === "track"

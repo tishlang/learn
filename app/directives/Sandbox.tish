@@ -44,6 +44,33 @@ fn parseBodyFiles(body, defaultPath) {
   return files
 }
 
+// Per-sandbox layout persistence.
+fn LAYOUT_KEY(id) { return "tish-sandbox-layout::" + id }
+
+fn loadLayout(id) {
+  try {
+    let raw = localStorage.getItem(LAYOUT_KEY(id))
+    if (raw === null) { return null }
+    let p = JSON.parse(raw)
+    if (p !== null && typeof p === "object" && "leftWidth" in p && "terminalHeight" in p) {
+      return { leftWidth: p.leftWidth, terminalHeight: p.terminalHeight }
+    }
+  } catch (e) { }
+  return null
+}
+
+fn saveLayout(id, lw, th) {
+  try {
+    localStorage.setItem(LAYOUT_KEY(id), JSON.stringify({ leftWidth: lw, terminalHeight: th }))
+  } catch (e) { }
+}
+
+fn clamp(v, lo, hi) {
+  if (v < lo) { return lo }
+  if (v > hi) { return hi }
+  return v
+}
+
 export fn Sandbox(props) {
   let attrs = props.attrs
   let body = "body" in props ? props.body : ""
@@ -61,6 +88,17 @@ export fn Sandbox(props) {
   let previewState = useRef(null)
   let runIdRef = useRef(0)
   let runBtnRef = useRef(null)
+  let bodyRef = useRef(null)
+  let rightColRef = useRef(null)
+
+  // Layout: percentage shares for the vertical (left/right in IDE mode) and
+  // horizontal (terminal area) splits. Persisted per-sandbox-id so each
+  // exercise remembers its own arrangement.
+  let layoutId = opt(attrs, "id", "default")
+  let saved = loadLayout(layoutId)
+  let initialLeft = saved !== null ? saved.leftWidth : (kind === "ide" ? 50 : 100)
+  let initialTerm = saved !== null ? saved.terminalHeight : (kind === "ide" ? 30 : 35)
+  let layoutRef = useRef({ leftWidth: initialLeft, terminalHeight: initialTerm })
 
   fn findEntry(p) {
     let i = 0
@@ -129,6 +167,61 @@ export fn Sandbox(props) {
     return () => window.removeEventListener("message", onMsg)
   }, [])
 
+  // Apply the persisted layout once the body element exists.
+  useLayoutEffect(() => {
+    if (bodyRef.current === null) { return }
+    bodyRef.current.style.setProperty("--sb-left", String(layoutRef.current.leftWidth))
+    bodyRef.current.style.setProperty("--sb-term", String(layoutRef.current.terminalHeight))
+  }, [])
+
+  // Drag handlers: write CSS vars directly during the drag (zero re-renders),
+  // persist to localStorage on mouseup.
+  fn startResizeV(e) {
+    if (e.button !== 0) { return }
+    e.preventDefault()
+    let host = bodyRef.current
+    if (host === null) { return }
+    document.body.classList.add("dir-sandbox-resizing-v")
+    fn onMove(ev) {
+      let r = host.getBoundingClientRect()
+      let pct = clamp(((ev.clientX - r.left) / r.width) * 100, 20, 80)
+      host.style.setProperty("--sb-left", String(pct))
+      layoutRef.current = { leftWidth: pct, terminalHeight: layoutRef.current.terminalHeight }
+    }
+    fn onUp() {
+      document.removeEventListener("mousemove", onMove)
+      document.removeEventListener("mouseup", onUp)
+      document.body.classList.remove("dir-sandbox-resizing-v")
+      saveLayout(layoutId, layoutRef.current.leftWidth, layoutRef.current.terminalHeight)
+    }
+    document.addEventListener("mousemove", onMove)
+    document.addEventListener("mouseup", onUp)
+  }
+
+  fn startResizeH(e) {
+    if (e.button !== 0) { return }
+    e.preventDefault()
+    let host = bodyRef.current
+    if (host === null) { return }
+    let measure = host
+    if (kind === "ide" && rightColRef.current !== null) { measure = rightColRef.current }
+    document.body.classList.add("dir-sandbox-resizing-h")
+    fn onMove(ev) {
+      let r = measure.getBoundingClientRect()
+      let pct = clamp(((r.bottom - ev.clientY) / r.height) * 100, 15, 70)
+      host.style.setProperty("--sb-term", String(pct))
+      layoutRef.current = { leftWidth: layoutRef.current.leftWidth, terminalHeight: pct }
+    }
+    fn onUp() {
+      document.removeEventListener("mousemove", onMove)
+      document.removeEventListener("mouseup", onUp)
+      document.body.classList.remove("dir-sandbox-resizing-h")
+      saveLayout(layoutId, layoutRef.current.leftWidth, layoutRef.current.terminalHeight)
+    }
+    document.addEventListener("mousemove", onMove)
+    document.addEventListener("mouseup", onUp)
+  }
+
   let paths = []
   let i = 0
   while (i < files.length) { paths.push(files[i].path); i = i + 1 }
@@ -142,17 +235,19 @@ export fn Sandbox(props) {
   if (kind === "ide") {
     return <div class="dir-sandbox dir-sandbox-ide">
       {header}
-      <div class="dir-sandbox-body">
+      <div ref={bodyRef} class="dir-sandbox-body">
         <div class="dir-sandbox-left">
           {files.length > 1 ? FileBrowserPanel(paths, currentPath, onSelect) : null}
           <div class="dir-sandbox-editor">
             {EditorPanel(editorApi, curEntry !== null ? curEntry.text : "", currentPath, null, null)}
           </div>
         </div>
-        <div class="dir-sandbox-right">
+        <div class="dir-sandbox-resize-v" role="separator" onmousedown={startResizeV} title="Drag to resize" />
+        <div ref={rightColRef} class="dir-sandbox-right">
           <div class="dir-sandbox-preview">
             {WebPreviewPanel(previewApi, previewState)}
           </div>
+          <div class="dir-sandbox-resize-h" role="separator" onmousedown={startResizeH} title="Drag to resize" />
           <div class="dir-sandbox-terminal">
             {TerminalPanel(terminalApi)}
           </div>
@@ -163,10 +258,11 @@ export fn Sandbox(props) {
 
   return <div class="dir-sandbox dir-sandbox-console">
     {header}
-    <div class="dir-sandbox-body">
+    <div ref={bodyRef} class="dir-sandbox-body">
       <div class="dir-sandbox-editor">
         {EditorPanel(editorApi, curEntry !== null ? curEntry.text : "", currentPath, null, null)}
       </div>
+      <div class="dir-sandbox-resize-h" role="separator" onmousedown={startResizeH} title="Drag to resize" />
       <div class="dir-sandbox-terminal">
         {TerminalPanel(terminalApi)}
       </div>
