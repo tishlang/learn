@@ -1,0 +1,408 @@
+// PickAssembler — Duolingo-style "tap chips to build the program" widget.
+//
+// Two modes:
+//
+//   1. mode=assemble (DEFAULT)
+//      Body holds a sequence of correct tokens, separated by whitespace
+//      (or one-per-line; both work). Plus any number of distractor tokens
+//      from `distractors=...`. We shuffle the union and present them as
+//      chips. Learner taps chips in order to fill the goal slots; tap a
+//      slotted chip to return it to the tray. When all slots are filled
+//      the program is run via the VM and stdout is compared to
+//      `expected-output` (or, when no `expected-output`, the assembled
+//      token sequence is compared to the body sequence).
+//
+//   2. mode=blanks
+//      Body is a code template with `___` placeholders. For each blank
+//      the directive lists a small set of options + the answer
+//      (parsed from the body block). Tapping a chip fills that one slot.
+//
+// Props (from the directive attrs / body):
+//   id              : stable identifier (used for progress persistence)
+//   mode            : "assemble" | "blanks"
+//   expected        : optional expected stdout (for assemble mode)
+//   tokens          : array of correct tokens in order (assemble)
+//   distractors     : array of red-herring tokens (assemble)
+//   template        : code with `___` placeholders (blanks)
+//   blanks          : array of { options: [...], answer: "..." } per slot (blanks)
+//   onPass          : callback when the learner gets it right
+//
+// Chips render with TishHighlight token classes for color, so syntax categories
+// click subconsciously without anyone having to teach "this is a string."
+
+import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
+import { runVm, highlightToHtml } from "tish-ide-panels"
+import { opt } from "../utils/objects.tish"
+
+fn normalizeOut(s) {
+  if (s === null || s === undefined) { return "" }
+  let t = String(s).split("\r\n").join("\n").split("\r").join("\n")
+  let lines = t.split("\n")
+  let out = []
+  let i = 0
+  while (i < lines.length) {
+    let line = lines[i]
+    let j = line.length
+    while (j > 0) {
+      let c = line.charAt(j - 1)
+      if (c === " " || c === "\t") { j = j - 1 } else { break }
+    }
+    out.push(line.substring(0, j))
+    i = i + 1
+  }
+  while (out.length > 0 && out[0] === "") { out.shift() }
+  while (out.length > 0 && out[out.length - 1] === "") { out.pop() }
+  return out.join("\n")
+}
+
+// Deterministic Fisher-Yates with a seeded LCG so each render of the same
+// `id` produces the same shuffled tray (no flicker between rerenders).
+fn seededShuffle(arr, seed) {
+  let s = seed
+  if (s === 0) { s = 1 }
+  let out = arr.slice(0)
+  let i = out.length - 1
+  while (i > 0) {
+    s = (s * 1664525 + 1013904223) & 2147483647
+    let j = s % (i + 1)
+    let tmp = out[i]
+    out[i] = out[j]
+    out[j] = tmp
+    i = i - 1
+  }
+  return out
+}
+
+fn hashString(s) {
+  let h = 5381
+  let i = 0
+  while (i < s.length) {
+    h = ((h * 33) + s.charCodeAt(i)) & 2147483647
+    i = i + 1
+  }
+  return h
+}
+
+// Render a token using the Tish highlighter so chips pick up keyword/string
+// colors automatically. innerHTML is set via dangerouslySet... pattern in JSX.
+fn TokenChip(props) {
+  let token = props.token
+  let onClick = props.onClick
+  let cls = props.class !== null && props.class !== undefined ? props.class : "pick-chip"
+  let ref = useRef(null)
+  useLayoutEffect(() => {
+    if (ref.current !== null) {
+      ref.current.innerHTML = highlightToHtml(token, "main.tish")
+    }
+  }, null)
+  return <button class={cls} onclick={onClick} ref={ref} />
+}
+
+// Assemble mode — render slots + tray.
+fn AssembleMode(props) {
+  let id = props.id
+  let tokens = props.tokens
+  let distractors = props.distractors
+  let expected = props.expected
+  let onPass = props.onPass
+
+  let totalSlots = tokens.length
+  let initialSlots = []
+  let i = 0
+  while (i < totalSlots) { initialSlots.push(null); i = i + 1 }
+
+  let slotsState = useState(initialSlots)
+  let slots = slotsState[0]
+  let setSlots = slotsState[1]
+
+  // Tray is a list of { tok, slot } parallel to a stable index.
+  let trayItems = useMemo(() => {
+    let all = []
+    let i2 = 0
+    while (i2 < tokens.length) { all.push({ tok: tokens[i2], slot: -1 }); i2 = i2 + 1 }
+    let j = 0
+    while (j < distractors.length) { all.push({ tok: distractors[j], slot: -1 }); j = j + 1 }
+    return seededShuffle(all, hashString(id))
+  }, [id])
+
+  let trayState = useState(trayItems.slice(0))
+  let tray = trayState[0]
+  let setTray = trayState[1]
+
+  let resultState = useState(null)
+  let result = resultState[0]
+  let setResult = resultState[1]
+  let passedRef = useRef(false)
+
+  fn onTrayClick(idxInTray) {
+    let entry = tray[idxInTray]
+    if (entry === null || entry.slot !== -1) { return }
+    // Find first empty slot.
+    let i3 = 0
+    while (i3 < slots.length) {
+      if (slots[i3] === null) { break }
+      i3 = i3 + 1
+    }
+    if (i3 >= slots.length) { return }
+    let nextSlots = slots.slice(0)
+    nextSlots[i3] = entry.tok
+    setSlots(nextSlots)
+    let nextTray = tray.slice(0)
+    nextTray[idxInTray] = { tok: entry.tok, slot: i3 }
+    setTray(nextTray)
+  }
+
+  fn onSlotClick(slotIdx) {
+    if (slots[slotIdx] === null) { return }
+    let nextSlots = slots.slice(0)
+    nextSlots[slotIdx] = null
+    setSlots(nextSlots)
+    // Find which tray entry held this slot index and free it.
+    let nextTray = tray.slice(0)
+    let i4 = 0
+    while (i4 < nextTray.length) {
+      if (nextTray[i4].slot === slotIdx) { nextTray[i4] = { tok: nextTray[i4].tok, slot: -1 }; break }
+      i4 = i4 + 1
+    }
+    setTray(nextTray)
+  }
+
+  fn doCheck() {
+    let allFilled = true
+    let i5 = 0
+    while (i5 < slots.length) {
+      if (slots[i5] === null) { allFilled = false; break }
+      i5 = i5 + 1
+    }
+    if (!allFilled) {
+      setResult({ ok: false, msg: "Fill in every slot first." })
+      return
+    }
+    let assembled = slots.join(" ")
+    let actualOut = ""
+    let err = null
+    try {
+      let lines = runVm(assembled, "main.tish", null)
+      actualOut = lines.join("\n")
+    } catch (e) { err = String(e) }
+    let ok = false
+    if (err === null) {
+      if (expected !== null) {
+        ok = normalizeOut(actualOut) === normalizeOut(expected)
+      } else {
+        // Compare assembled token order to authored order.
+        ok = slots.join(" ") === tokens.join(" ")
+      }
+    }
+    if (ok && !passedRef.current) {
+      passedRef.current = true
+      if (onPass !== null && onPass !== undefined) { onPass() }
+    } else if (!ok) {
+      passedRef.current = false
+    }
+    setResult({ ok: ok, msg: err !== null ? err : (ok ? "Correct!" : "Not quite — try again."), out: actualOut })
+  }
+
+  fn doReset() {
+    let cleared = []
+    let k = 0
+    while (k < slots.length) { cleared.push(null); k = k + 1 }
+    setSlots(cleared)
+    let nextTray = []
+    let m = 0
+    while (m < tray.length) {
+      nextTray.push({ tok: tray[m].tok, slot: -1 })
+      m = m + 1
+    }
+    setTray(nextTray)
+    setResult(null)
+    passedRef.current = false
+  }
+
+  // Build slot views.
+  let slotViews = []
+  let s = 0
+  while (s < slots.length) {
+    if (slots[s] === null) {
+      slotViews.push(<span class="pick-slot pick-slot-empty">{"_"}</span>)
+    } else {
+      let slotIdx = s
+      slotViews.push(<TokenChip token={slots[s]} class="pick-slot pick-slot-filled" onClick={() => onSlotClick(slotIdx)} />)
+    }
+    s = s + 1
+  }
+
+  // Build tray views.
+  let trayViews = []
+  let t = 0
+  while (t < tray.length) {
+    let entry = tray[t]
+    if (entry.slot >= 0) {
+      trayViews.push(<span class="pick-chip pick-chip-used">{entry.tok}</span>)
+    } else {
+      let trayIdx = t
+      trayViews.push(<TokenChip token={entry.tok} class="pick-chip" onClick={() => onTrayClick(trayIdx)} />)
+    }
+    t = t + 1
+  }
+
+  let resultClass = "pick-result"
+  if (result !== null) {
+    resultClass = result.ok ? "pick-result pick-result-ok" : "pick-result pick-result-fail"
+  }
+
+  return <div class="pick-root pick-mode-assemble">
+    <div class="pick-slots">{slotViews}</div>
+    <div class="pick-tray">{trayViews}</div>
+    <div class="pick-controls">
+      <button class="pick-check" onclick={doCheck}>{"Check"}</button>
+      <button class="pick-reset" onclick={doReset}>{"Reset"}</button>
+    </div>
+    {result !== null
+      ? <div class={resultClass}>{result.msg}</div>
+      : null}
+  </div>
+}
+
+// Blanks mode — render template with chip rows per blank.
+fn BlanksMode(props) {
+  let id = props.id
+  let template = props.template
+  let blanks = props.blanks
+  let expected = props.expected
+  let onPass = props.onPass
+
+  let initialChoices = []
+  let i = 0
+  while (i < blanks.length) { initialChoices.push(null); i = i + 1 }
+
+  let choicesState = useState(initialChoices)
+  let choices = choicesState[0]
+  let setChoices = choicesState[1]
+  let resultState = useState(null)
+  let result = resultState[0]
+  let setResult = resultState[1]
+  let passedRef = useRef(false)
+
+  fn onPick(blankIdx, value) {
+    let next = choices.slice(0)
+    next[blankIdx] = value
+    setChoices(next)
+  }
+
+  fn assemble() {
+    let parts = template.split("___")
+    let out = ""
+    let i2 = 0
+    while (i2 < parts.length) {
+      out = out + parts[i2]
+      if (i2 < parts.length - 1 && i2 < choices.length) {
+        let v = choices[i2]
+        out = out + (v === null ? "___" : v)
+      }
+      i2 = i2 + 1
+    }
+    return out
+  }
+
+  fn doCheck() {
+    let allFilled = true
+    let k = 0
+    while (k < choices.length) {
+      if (choices[k] === null) { allFilled = false; break }
+      k = k + 1
+    }
+    if (!allFilled) {
+      setResult({ ok: false, msg: "Pick a value for every blank." })
+      return
+    }
+    let assembled = assemble()
+    let actualOut = ""
+    let err = null
+    try {
+      let lines = runVm(assembled, "main.tish", null)
+      actualOut = lines.join("\n")
+    } catch (e) { err = String(e) }
+    let ok = false
+    if (err === null) {
+      if (expected !== null) {
+        ok = normalizeOut(actualOut) === normalizeOut(expected)
+      } else {
+        // Verify each choice equals the authored answer.
+        ok = true
+        let m = 0
+        while (m < blanks.length) {
+          if (choices[m] !== blanks[m].answer) { ok = false; break }
+          m = m + 1
+        }
+      }
+    }
+    if (ok && !passedRef.current) {
+      passedRef.current = true
+      if (onPass !== null && onPass !== undefined) { onPass() }
+    }
+    setResult({ ok: ok, msg: err !== null ? err : (ok ? "Correct!" : "Not quite — try again."), out: actualOut })
+  }
+
+  // Render the template as a sequence of code spans + chip rows.
+  let parts = template.split("___")
+  let blocks = []
+  let b = 0
+  while (b < parts.length) {
+    blocks.push(<pre class="pick-template">{parts[b]}</pre>)
+    if (b < parts.length - 1 && b < blanks.length) {
+      let blankIdx = b
+      let blankSpec = blanks[b]
+      let opts = opt(blankSpec, "options", [])
+      let chipRow = []
+      let q = 0
+      while (q < opts.length) {
+        let optTok = opts[q]
+        let chosen = choices[blankIdx] === optTok
+        let cls = chosen ? "pick-chip pick-chip-chosen" : "pick-chip"
+        let captured = optTok
+        chipRow.push(<TokenChip token={captured} class={cls} onClick={() => onPick(blankIdx, captured)} />)
+        q = q + 1
+      }
+      blocks.push(<div class="pick-blank-row">
+        <span class="pick-blank-label">{"Blank " + String(blankIdx + 1) + ":"}</span>
+        <div class="pick-blank-options">{chipRow}</div>
+      </div>)
+    }
+    b = b + 1
+  }
+
+  let resultClass = "pick-result"
+  if (result !== null) {
+    resultClass = result.ok ? "pick-result pick-result-ok" : "pick-result pick-result-fail"
+  }
+
+  return <div class="pick-root pick-mode-blanks">
+    {blocks}
+    <div class="pick-controls">
+      <button class="pick-check" onclick={doCheck}>{"Check"}</button>
+    </div>
+    {result !== null ? <div class={resultClass}>{result.msg}</div> : null}
+  </div>
+}
+
+export fn PickAssembler(props) {
+  let id = opt(props, "id", "pick-anon")
+  let mode = opt(props, "mode", "assemble")
+  let expected = opt(props, "expected", null)
+  let onPass = opt(props, "onPass", null)
+  if (mode === "blanks") {
+    return <BlanksMode
+      id={id}
+      template={opt(props, "template", "")}
+      blanks={opt(props, "blanks", [])}
+      expected={expected}
+      onPass={onPass} />
+  }
+  return <AssembleMode
+    id={id}
+    tokens={opt(props, "tokens", [])}
+    distractors={opt(props, "distractors", [])}
+    expected={expected}
+    onPass={onPass} />
+}

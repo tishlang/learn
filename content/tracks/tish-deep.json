@@ -1,0 +1,66 @@
+{
+  "title": "Tish, in depth",
+  "description": "If you already code. Mirrors LANGUAGE.md and the tishlang.com docs.",
+  "parts": [
+    {
+      "title": "Part I — Orientation",
+      "chapters": [
+        { "id": "01-why-tish", "title": "Why Tish?", "summary": "Same source, three runtimes." },
+        { "id": "02-tour", "title": "10-minute tour", "summary": "Condensed grammar sweep." },
+        { "id": "03-vs-javascript", "title": "Tish vs JavaScript", "summary": "Definitive list of deltas." },
+        { "id": "04-blocks-indent", "title": "Blocks — braces vs indent", "summary": "Two equivalent styles." }
+      ]
+    },
+    {
+      "title": "Part II — Core language",
+      "chapters": [
+        { "id": "05-variables-scope", "title": "Variables and scope", "summary": "Lexical scope, no TDZ, source-order semantics." },
+        { "id": "06-functions", "title": "Functions", "summary": "fn, single-expr, arrows, async, closures." },
+        { "id": "07-control-flow", "title": "Control flow", "summary": "if / while / for / switch / try." },
+        { "id": "08-strings-numbers", "title": "Strings and numbers", "summary": "Unicode scalar indices, 32-bit bitwise." },
+        { "id": "09-arrays-objects", "title": "Arrays and objects", "summary": "Plain data, fixed shapes." },
+        { "id": "10-new-and-construct", "title": "new and construct", "summary": "Why no class but yes new." }
+      ]
+    },
+    {
+      "title": "Part III — Async, errors, I/O",
+      "chapters": [
+        { "id": "11-promises", "title": "Promises", "summary": "ECMA-style." },
+        { "id": "12-async-await", "title": "async / await", "summary": "Top-level await, timers." },
+        { "id": "13-http-client", "title": "HTTP client", "summary": "fetch, ReadableStream body, single-consumer rule." },
+        { "id": "14-http-server", "title": "HTTP server", "summary": "serve(port, handler)." },
+        { "id": "15-fs", "title": "Filesystem", "summary": "readFile / writeFile / readDir." },
+        { "id": "16-process", "title": "Process", "summary": "argv, env, cwd, exit." },
+        { "id": "17-regex", "title": "RegExp", "summary": "The regex feature flag." },
+        { "id": "18-feature-flags", "title": "Feature flags", "summary": "Secure-by-default I/O." }
+      ]
+    },
+    {
+      "title": "Part IV — Modules and types",
+      "chapters": [
+        { "id": "19-modules-imports", "title": "Modules and imports", "summary": "Bare specifiers, native and npm." },
+        { "id": "20-cargo-imports", "title": "Cargo imports", "summary": "cargo:crate via tishlang-cargo-bindgen." },
+        { "id": "21-types-annotations", "title": "Optional type annotations", "summary": "Parsed today, checked tomorrow." },
+        { "id": "22-type-decls", "title": "type and declare", "summary": "Naming types, ambient builtins." }
+      ]
+    },
+    {
+      "title": "Part V — UI and native compile",
+      "chapters": [
+        { "id": "23-jsx-lattish", "title": "JSX and Lattish", "summary": "Hooks, render model." },
+        { "id": "24-native-ui-macos", "title": "Native macOS UI", "summary": "tish:macos AppKit hooks." },
+        { "id": "25-native-modules", "title": "Native modules", "summary": "tish:waterui / polars / shadertoy." },
+        { "id": "26-build-targets", "title": "Build targets — overview", "summary": "Same source, six exits at a glance." },
+        { "id": "26a-tish-run", "title": "tish run — interpreter & VM", "summary": "The dev loop. Two backends, both in-process." },
+        { "id": "26b-native-rust", "title": "tish build — native (rust)", "summary": "Default native path. Cargo, full ecosystem." },
+        { "id": "26c-native-cranelift", "title": "tish build — native (cranelift)", "summary": "Embedded bytecode + VM. Fast builds, pure Tish." },
+        { "id": "26d-native-llvm", "title": "tish build — native (llvm)", "summary": "Same model as cranelift, linked through clang." },
+        { "id": "26e-target-js", "title": "tish build --target js", "summary": "Plain JS bundles for browsers, Node, Bun." },
+        { "id": "26f-target-wasm", "title": "tish build --target wasm", "summary": "WebAssembly for browsers. VM packaged as wasm." },
+        { "id": "26g-target-wasi", "title": "tish build --target wasi", "summary": "One .wasm for Wasmtime, edge runtimes, serverless." },
+        { "id": "27-tooling", "title": "Tooling", "summary": "tish-fmt, lint, lsp, REPL, VS Code." },
+        { "id": "28-deploy", "title": "Deploy", "summary": "zectre, Docker, single binaries." }
+      ]
+    }
+  ]
+}

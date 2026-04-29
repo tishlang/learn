@@ -1,0 +1,13 @@
+// ::tryit{code="..."} or :::tryit ... :::
+// Wraps MiniRunner with expected=null so it just shows captured output.
+
+import { MiniRunner } from "tish-ide-panels"
+import { opt } from "../utils/objects.tish"
+
+export fn TryIt(props) {
+  let attrs = props.attrs
+  let body = "body" in props ? props.body : ""
+  let id = opt(attrs, "id", "tryit-anon")
+  let initial = opt(attrs, "code", body !== "" ? body : "console.log(\"Hello\")")
+  return <MiniRunner key={id} initialCode={initial} expected={null} onPass={null} apiRef={null} />
+}

@@ -1,0 +1,81 @@
+// History-API router for tish-learn.
+//
+// URL shape:    /<track>/<chapter>
+// Examples:     /                              -> default landing (TrackPicker)
+//               /beginner                      -> beginner track index
+//               /beginner/01-hello             -> beginner ch 01-hello
+//               /capstones/chat/01-client-ui   -> capstone subdir chapter
+//
+// Requires the dev/static server to do SPA fallback (serve index.html for
+// any unknown path that isn't an asset or under /content/).
+
+import { useState, useLayoutEffect } from "lattish"
+
+export fn parsePath(pathname) {
+  let p = pathname
+  if (p === null || p === undefined) { p = "/" }
+  if (p.length > 0 && p.charAt(0) === "/") { p = p.substring(1) }
+  if (p.length === 0) { return { view: "home", track: null, chapter: null } }
+  let firstSlash = p.indexOf("/")
+  if (firstSlash < 0) {
+    return { view: "track", track: p, chapter: null }
+  }
+  let track = p.substring(0, firstSlash)
+  let chapter = p.substring(firstSlash + 1)
+  if (chapter.length === 0) {
+    return { view: "track", track: track, chapter: null }
+  }
+  return { view: "chapter", track: track, chapter: chapter }
+}
+
+export fn buildPath(track, chapter) {
+  if (track === null || track === undefined) { return "/" }
+  if (chapter === null || chapter === undefined || chapter === "") {
+    return "/" + track
+  }
+  return "/" + track + "/" + chapter
+}
+
+// Programmatic navigation. Uses pushState + a custom popstate dispatch so
+// existing useRoute subscribers re-render without a full page load.
+export fn navigate(track, chapter) {
+  let p = buildPath(track, chapter)
+  navigateRaw(p)
+}
+
+// Like navigate(), but takes a pre-built pathname (e.g. from an <a href>).
+export fn navigateRaw(pathname) {
+  let p = pathname === null || pathname === undefined ? "/" : pathname
+  if (typeof history !== "undefined" && typeof history.pushState === "function") {
+    history.pushState({}, "", p)
+    if (typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new PopStateEvent("popstate"))
+      } catch (e) {
+        // Older Safari needs the legacy Event constructor.
+        let ev = document.createEvent("Event")
+        ev.initEvent("popstate", false, false)
+        window.dispatchEvent(ev)
+      }
+    }
+  } else if (typeof location !== "undefined") {
+    location.href = p
+  }
+}
+
+export fn useRoute() {
+  let initialPath = typeof location !== "undefined" ? location.pathname : "/"
+  let routeState = useState(parsePath(initialPath))
+  let route = routeState[0]
+  let setRoute = routeState[1]
+
+  useLayoutEffect(() => {
+    fn onPop() {
+      setRoute(parsePath(location.pathname))
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [])
+
+  return route
+}

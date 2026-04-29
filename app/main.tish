@@ -1,0 +1,10 @@
+// Entry point. The wasm-bindgen ESMs are initialized by the inline boot
+// script in public/index.html (it sets the __tish* globals before importing
+// dist/learn.js), so by the time this module runs the compile/run helpers
+// from tish-ide-panels are available.
+
+import { createRoot } from "lattish"
+import { LearnApp } from "./LearnApp.tish"
+
+const root = document.getElementById("app")
+createRoot(root).render(LearnApp)

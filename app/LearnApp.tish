@@ -1,0 +1,274 @@
+// Top-level shell: header, sidebar with track + chapter list, content area.
+// Routes #/, #/<track>, #/<track>/<chapter>.
+
+import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
+import { useRoute, navigate, navigateRaw } from "./router.tish"
+import { useJsonResource, useTextResource, chapterUrl, trackManifestUrl } from "./content_loader.tish"
+import { completedChapters, useProgressVersion } from "./progress.tish"
+import { parseDocument } from "./tishdoc.tish"
+import { TrackPicker } from "./views/TrackPicker.tish"
+import { LessonView } from "./views/LessonView.tish"
+import { opt } from "./utils/objects.tish"
+
+const TRACKS = [
+  { id: "beginner", title: "Learn to code", subtitle: "Start from zero", emoji: "★" },
+  { id: "tish-deep", title: "Tish, in depth", subtitle: "If you already code", emoji: "▣" },
+  { id: "modules", title: "Modules", subtitle: "Lattish, Tailwind, and more", emoji: "◇" },
+  { id: "capstones", title: "Capstones", subtitle: "Build real apps", emoji: "▲" }
+]
+
+// Theme is tri-state: "system" (follow OS), "dark", "light".
+// Default is "system" so first-time visitors match their OS preference.
+
+fn THEME_KEY() { return "tish-learn-theme" }
+
+fn loadTheme() {
+  try {
+    let v = localStorage.getItem(THEME_KEY())
+    if (v === "light" || v === "dark" || v === "system") { return v }
+  } catch (e) { }
+  return "system"
+}
+
+fn saveTheme(t) {
+  try { localStorage.setItem(THEME_KEY(), t) } catch (e) { }
+}
+
+// Resolve "system" to the current OS preference; pass through "dark"/"light".
+fn resolveTheme(t) {
+  if (t === "dark" || t === "light") { return t }
+  if (typeof window === "undefined") { return "dark" }
+  if (typeof window.matchMedia !== "function") { return "dark" }
+  let mq = window.matchMedia("(prefers-color-scheme: dark)")
+  return mq.matches ? "dark" : "light"
+}
+
+fn applyTheme(t) {
+  if (typeof document === "undefined") { return }
+  let resolved = resolveTheme(t)
+  if (resolved === "dark") {
+    document.documentElement.classList.add("theme-dark")
+    document.documentElement.classList.remove("theme-light")
+  } else {
+    document.documentElement.classList.add("theme-light")
+    document.documentElement.classList.remove("theme-dark")
+  }
+}
+
+// Cycle: system -> dark -> light -> system
+fn nextTheme(t) {
+  if (t === "system") { return "dark" }
+  if (t === "dark") { return "light" }
+  return "system"
+}
+
+fn themeIcon(t) {
+  if (t === "dark") { return "☾" }
+  if (t === "light") { return "☀" }
+  return "◐"
+}
+
+fn themeLabel(t) {
+  if (t === "dark") { return "Dark" }
+  if (t === "light") { return "Light" }
+  return "System"
+}
+
+fn TrackSidebar(props) {
+  let trackId = props.trackId
+  let currentChapter = props.currentChapter
+  // Pure view: manifest is fetched in LearnApp and passed in as a prop.
+  let manifest = props.manifest
+
+  if (trackId === null) {
+    return <div class="ll-sidebar-empty">{"Pick a track from the left"}</div>
+  }
+  if (manifest.state === "loading") {
+    return <div class="ll-sidebar-empty">{"Loading track…"}</div>
+  }
+  if (manifest.state === "error") {
+    return <div class="ll-sidebar-error">{"Couldn't load track: " + manifest.error}</div>
+  }
+  let data = manifest.data
+  if (data === null) {
+    return <div class="ll-sidebar-empty">{"Empty manifest"}</div>
+  }
+  let parts = opt(data, "parts", [])
+  let done = completedChapters(trackId)
+  let groups = []
+  let p = 0
+  while (p < parts.length) {
+    let part = parts[p]
+    let title = opt(part, "title", "Part " + String(p + 1))
+    let chapters = opt(part, "chapters", [])
+    let items = []
+    let i = 0
+    while (i < chapters.length) {
+      let c = chapters[i]
+      let cid = opt(c, "id", "")
+      let ctitle = opt(c, "title", cid)
+      let isCurrent = currentChapter === cid
+      let isDone = cid in done
+      let cls = "ll-chap"
+      if (isCurrent) { cls = cls + " ll-chap-current" }
+      if (isDone) { cls = cls + " ll-chap-done" }
+      let label = ctitle
+      if (isDone) { label = "✓ " + label }
+      items.push(<button class={cls} onclick={() => navigate(trackId, cid)}>{label}</button>)
+      i = i + 1
+    }
+    groups.push(<div class="ll-sidebar-group">
+      <div class="ll-sidebar-group-title">{title}</div>
+      <div class="ll-sidebar-group-list">{items}</div>
+    </div>)
+    p = p + 1
+  }
+  return <div class="ll-sidebar-tree">{groups}</div>
+}
+
+fn Header(props) {
+  let theme = props.theme
+  let setTheme = props.setTheme
+  let route = props.route
+
+  fn switchTheme() {
+    let next = nextTheme(theme)
+    setTheme(next)
+    saveTheme(next)
+    applyTheme(next)
+  }
+
+  let trackButtons = []
+  let i = 0
+  while (i < TRACKS.length) {
+    let t = TRACKS[i]
+    let active = route.track === t.id
+    let cls = active ? "ll-track-btn ll-track-btn-active" : "ll-track-btn"
+    trackButtons.push(<button class={cls} onclick={() => navigate(t.id, null)}>
+      <span class="ll-track-emoji">{t.emoji}</span>
+      <span class="ll-track-title">{t.title}</span>
+    </button>)
+    i = i + 1
+  }
+
+  return <header class="ll-header">
+    <div class="ll-brand" onclick={() => navigate(null, null)}>
+      <span class="ll-brand-emoji">{"⌬"}</span>
+      <span class="ll-brand-text">{"tish-learn"}</span>
+    </div>
+    <nav class="ll-tracks">{trackButtons}</nav>
+    <div class="ll-header-right">
+      <button
+        class="ll-theme-toggle"
+        onclick={switchTheme}
+        title={"Theme: " + themeLabel(theme) + " (click to cycle System / Dark / Light)"}>
+        <span class="ll-theme-icon">{themeIcon(theme)}</span>
+        <span class="ll-theme-label">{themeLabel(theme)}</span>
+      </button>
+    </div>
+  </header>
+}
+
+export fn LearnApp() {
+  // Lattish has a single global hook cursor (no per-fiber lists), so hook
+  // ORDER and COUNT must be identical on every render. We achieve that by
+  // calling every data hook here, unconditionally, regardless of route. The
+  // data is then passed to view components as props (those views are pure
+  // renderers and call no hooks themselves).
+  let route = useRoute()
+  // Subscribe at the root so any progress mutation re-renders the entire tree
+  // (sidebar checkmarks, lesson "Mark complete" button, track-picker progress).
+  useProgressVersion()
+  let themeState = useState(loadTheme())
+  let theme = themeState[0]
+  let setTheme = themeState[1]
+
+  // Apply on every theme change. When the user cycles to a fixed value
+  // ("dark"/"light") we just override; when they cycle back to "system" we
+  // re-resolve from the OS at apply time.
+  useLayoutEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  // Intercept clicks on internal <a href="/..."> so they navigate via the SPA
+  // router instead of doing a full page load. External (http/https) links and
+  // links opened with a modifier or middle-click fall through to the browser.
+  useLayoutEffect(() => {
+    fn onClick(ev) {
+      if (ev.defaultPrevented) { return }
+      if (ev.button !== undefined && ev.button !== 0) { return }
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) { return }
+      let t = ev.target
+      while (t !== null && t !== undefined && t.tagName !== "A") { t = t.parentNode }
+      if (t === null || t === undefined) { return }
+      let href = t.getAttribute === undefined ? null : t.getAttribute("href")
+      if (href === null || href === undefined) { return }
+      if (href.length === 0 || href.charAt(0) !== "/") { return }
+      let target = t.getAttribute("target")
+      if (target !== null && target !== undefined && target !== "") { return }
+      ev.preventDefault()
+      navigateRaw(href)
+    }
+    document.addEventListener("click", onClick)
+    return () => document.removeEventListener("click", onClick)
+  }, [])
+
+  // While in "system" mode, react to OS preference changes live.
+  useLayoutEffect(() => {
+    if (theme !== "system") { return () => {} }
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return () => {}
+    }
+    let mq = window.matchMedia("(prefers-color-scheme: dark)")
+    fn onChange() { applyTheme("system") }
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", onChange)
+      return () => mq.removeEventListener("change", onChange)
+    }
+    if (typeof mq.addListener === "function") {
+      mq.addListener(onChange)
+      return () => mq.removeListener(onChange)
+    }
+    return () => {}
+  }, [theme])
+
+  // Track manifest — used by sidebar (track + chapter views) and by the
+  // focused-track main view. Empty path when no track is selected.
+  let manifestPath = route.track !== null ? trackManifestUrl(route.track) : ""
+  let manifest = useJsonResource(manifestPath)
+
+  // Chapter text — only meaningful in "chapter" view; otherwise empty path
+  // keeps the hook idle but present at a stable cursor position.
+  let chapterPath = route.view === "chapter" && route.track !== null && route.chapter !== null
+    ? chapterUrl(route.track, route.chapter)
+    : ""
+  let chapterRes = useTextResource(chapterPath)
+  let parsed = useMemo(() => {
+    if (chapterRes.state !== "ready") { return [] }
+    return parseDocument(chapterRes.text)
+  }, [chapterRes.text, chapterRes.state])
+
+  let main = null
+  if (route.view === "home") {
+    main = <TrackPicker tracks={TRACKS} />
+  } else if (route.view === "track") {
+    main = <TrackPicker tracks={TRACKS} focusedTrack={route.track} manifest={manifest} />
+  } else {
+    let lessonKey = (route.track !== null ? route.track : "") + "/" + (route.chapter !== null ? route.chapter : "")
+    main = <LessonView key={lessonKey} track={route.track} chapter={route.chapter} res={chapterRes} parsed={parsed} />
+  }
+
+  let showSidebar = route.view === "chapter" || route.view === "track"
+
+  return <div class="ll-app">
+    <Header theme={theme} setTheme={setTheme} route={route} />
+    <div class="ll-body">
+      {showSidebar
+        ? <aside class="ll-sidebar">
+            <TrackSidebar trackId={route.track} currentChapter={route.chapter} manifest={manifest} />
+          </aside>
+        : null}
+      <main class="ll-main">{main}</main>
+    </div>
+  </div>
+}

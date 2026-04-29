@@ -1,0 +1,87 @@
+{
+  "title": "Learn to code",
+  "description": "From zero to shipping a real webpage. Forty short chapters.",
+  "parts": [
+    {
+      "title": "Part I — Hello, code",
+      "chapters": [
+        { "id": "01-hello", "title": "Hello, code", "summary": "Run your first program." },
+        { "id": "02-errors", "title": "Errors are friends", "summary": "Read what the computer tells you." },
+        { "id": "03-variables", "title": "Variables", "summary": "Name a value to use it later." },
+        { "id": "BP-01-read-the-error", "title": "Best practice — read the error", "summary": "A mindset shift." },
+        { "id": "04-constants", "title": "Constants", "summary": "Values that don't change." }
+      ]
+    },
+    {
+      "title": "Part II — Numbers, words, choices",
+      "chapters": [
+        { "id": "05-numbers", "title": "Numbers and math", "summary": "Arithmetic." },
+        { "id": "06-strings", "title": "Strings", "summary": "Text in code." },
+        { "id": "07-string-methods", "title": "String methods", "summary": "slice, includes, split, trim." },
+        { "id": "BP-02-name-it-well", "title": "Best practice — name things well", "summary": "Clear names beat clever names." },
+        { "id": "08-booleans", "title": "Booleans and comparisons", "summary": "true, false, ===, !==." },
+        { "id": "09-if-else", "title": "If / else", "summary": "Branching." },
+        { "id": "10-else-if", "title": "Else-if and ternary", "summary": "Many cases, compact form." },
+        { "id": "11-logical-ops", "title": "Logical operators", "summary": "&&, ||, !, ??." }
+      ]
+    },
+    {
+      "title": "Part III — Repetition and collections",
+      "chapters": [
+        { "id": "12-while", "title": "While loops", "summary": "Repeat until a condition is false." },
+        { "id": "13-for", "title": "For loops", "summary": "C-style and for...of." },
+        { "id": "BP-03-console-log-debug", "title": "Best practice — console.log to debug", "summary": "Print what you can't see." },
+        { "id": "14-loop-control", "title": "Break and continue", "summary": "Early-exit and skip." },
+        { "id": "15-arrays", "title": "Arrays", "summary": "Lists of values." },
+        { "id": "16-array-methods", "title": "Array methods", "summary": "push, pop, slice, concat, includes." },
+        { "id": "17-iterating", "title": "Iterating with for...of", "summary": "Walk every item." },
+        { "id": "18-map-filter-reduce", "title": "Map, filter, reduce", "summary": "Power tools for arrays." }
+      ]
+    },
+    {
+      "title": "Part IV — Objects and functions",
+      "chapters": [
+        { "id": "19-objects", "title": "Objects", "summary": "Named bags of values." },
+        { "id": "20-object-iter", "title": "Iterating objects", "summary": "Object.keys / values / entries." },
+        { "id": "21-functions", "title": "Functions", "summary": "Reusable named recipes." },
+        { "id": "22-arrow-fns", "title": "Arrow functions", "summary": "Compact one-liners." },
+        { "id": "BP-04-smaller-pieces", "title": "Best practice — smaller pieces", "summary": "One function, one job." },
+        { "id": "23-scope", "title": "Scope and shadowing", "summary": "Where a variable is visible." },
+        { "id": "24-closures", "title": "Closures", "summary": "Functions that remember." }
+      ]
+    },
+    {
+      "title": "Part V — Real-world I/O",
+      "chapters": [
+        { "id": "25-errors-try-catch", "title": "try / catch", "summary": "Recover from errors." },
+        { "id": "26-json", "title": "JSON", "summary": "Save and load data." },
+        { "id": "BP-05-comment-why", "title": "Best practice — comment why, not what", "summary": "Explain intent." },
+        { "id": "27-modules", "title": "Modules", "summary": "Split your code." },
+        { "id": "28-console-tools", "title": "Logging tools", "summary": "log / info / warn / error / debug." },
+        { "id": "29-reading-docs", "title": "Reading the docs", "summary": "Find and use documentation." },
+        { "id": "BP-06-run-early-run-often", "title": "Best practice — run early, run often", "summary": "Tiny iterations beat big rewrites." }
+      ]
+    },
+    {
+      "title": "Part VI — Your first webpage",
+      "chapters": [
+        { "id": "30-jsx-basics", "title": "Your first webpage", "summary": "JSX, createRoot, useState." },
+        { "id": "31-forms-and-inputs", "title": "Forms and inputs", "summary": "Live BMI calculator." },
+        { "id": "32-lists-and-keys", "title": "Rendering lists", "summary": "Sticky-notes board." },
+        { "id": "33-localstorage-persist", "title": "localStorage", "summary": "Survive a reload." }
+      ]
+    },
+    {
+      "title": "Part VII — Useful real apps",
+      "chapters": [
+        { "id": "34-fetching-data", "title": "Fetching real data", "summary": "Weather widget against a real API." },
+        { "id": "35-canvas-and-events", "title": "Canvas and events", "summary": "Build a drawing pad." },
+        { "id": "36-game-loop", "title": "Game loops — Snake", "summary": "Build a complete arcade game." },
+        { "id": "37-realtime-chat", "title": "Real-time chat", "summary": "BroadcastChannel-backed two-tab chat." },
+        { "id": "38-virtual-fs", "title": "A file system in your tab", "summary": "IndexedDB-backed virtual disk." },
+        { "id": "39-static-site-export", "title": "Static-site export", "summary": "Build & download your notes site." },
+        { "id": "40-whats-next", "title": "What's next", "summary": "Where to go from here." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "tish-learn",
+  "version": "0.1.0",
+  "description": "Learn to code with Tish — fully featured education platform. 100% Tish, zero JS deps, zero backend.",
+  "license": "PIF",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:css": "tish run --feature fs --feature http build-css.tish",
+    "dev": "tish run --feature fs --feature http --feature process dev-server.tish"
+  },
+  "dependencies": {
+    "lattish": "../lattish",
+    "tish-ide-panels": "../tish-ide-panels",
+    "tish-tailwind": "../tish-tailwind",
+    "tish-browser-server": "../tish-browser-server"
+  }
+}

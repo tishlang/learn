@@ -1,0 +1,108 @@
+// Fetches lesson markdown + track manifests from /content/, caches in-memory.
+// Surfaces { state: "idle"|"loading"|"ready"|"error", text?, error? }.
+
+import { useState, useLayoutEffect } from "lattish"
+
+let cache = {}
+
+export async fn loadText(path) {
+  if (path in cache) { return cache[path] }
+  try {
+    let res = await fetch(path)
+    if (!res.ok) {
+      let err = "HTTP " + String(res.status) + " " + res.statusText
+      cache[path] = { error: err }
+      return { error: err }
+    }
+    let body = await res.text()
+    // Guarantee a string. Some runtimes / edge fetches yield non-string values
+    // we'd otherwise pass through and explode in downstream parsers.
+    let text = body !== null && body !== undefined ? String(body) : ""
+    cache[path] = { text: text }
+    return { text: text }
+  } catch (e) {
+    let err = String(e)
+    cache[path] = { error: err }
+    return { error: err }
+  }
+}
+
+export async fn loadJson(path) {
+  let r = await loadText(path)
+  if ("error" in r) { return r }
+  try {
+    return { data: JSON.parse(r.text) }
+  } catch (e) {
+    return { error: "JSON parse: " + String(e) }
+  }
+}
+
+// Hook: returns { state, text, error } for a given path.
+export fn useTextResource(path) {
+  let stateRef = useState({ state: "loading", text: "", error: "" })
+  let s = stateRef[0]
+  let setS = stateRef[1]
+
+  useLayoutEffect(() => {
+    if (path === null || path === undefined || path === "") {
+      setS({ state: "idle", text: "", error: "" })
+      return () => {}
+    }
+    setS({ state: "loading", text: "", error: "" })
+    let cancelled = false
+    fn run() {
+      loadText(path).then((r) => {
+        if (cancelled) { return }
+        if ("error" in r) {
+          setS({ state: "error", text: "", error: r.error })
+        } else {
+          let safe = "text" in r && r.text !== null && r.text !== undefined ? r.text : ""
+          setS({ state: "ready", text: safe, error: "" })
+        }
+      })
+    }
+    run()
+    return () => { cancelled = true }
+  }, [path])
+
+  return s
+}
+
+export fn useJsonResource(path) {
+  let stateRef = useState({ state: "loading", data: null, error: "" })
+  let s = stateRef[0]
+  let setS = stateRef[1]
+
+  useLayoutEffect(() => {
+    if (path === null || path === undefined || path === "") {
+      setS({ state: "idle", data: null, error: "" })
+      return () => {}
+    }
+    setS({ state: "loading", data: null, error: "" })
+    let cancelled = false
+    fn run() {
+      loadJson(path).then((r) => {
+        if (cancelled) { return }
+        if ("error" in r) {
+          setS({ state: "error", data: null, error: r.error })
+        } else {
+          setS({ state: "ready", data: r.data, error: "" })
+        }
+      })
+    }
+    run()
+    return () => { cancelled = true }
+  }, [path])
+
+  return s
+}
+
+// Convenience: build the URL of a track manifest or chapter file.
+export fn trackManifestUrl(trackId) {
+  return "/content/tracks/" + trackId + ".json"
+}
+
+export fn chapterUrl(trackId, chapterId) {
+  // Capstones use sub-paths like "chat/01-client-ui"; treat them transparently.
+  return "/content/" + trackId + "/" + chapterId + ".tishdoc.md"
+}

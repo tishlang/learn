@@ -1,0 +1,37 @@
+// Small object helpers. Tish throws on missing-property access, so use these
+// instead of `obj.x !== undefined`.
+
+export fn opt(o, key, fallback) {
+  if (o === null || o === undefined) { return fallback }
+  if (typeof o !== "object") { return fallback }
+  if (key in o) {
+    let v = o[key]
+    if (v !== null) { return v }
+  }
+  return fallback
+}
+
+export fn has(o, key) {
+  if (o === null || o === undefined) { return false }
+  if (typeof o !== "object") { return false }
+  return key in o
+}
+
+export fn isFileError(v) {
+  if (v === null) { return true }
+  if (typeof v === "object" && "error" in v) { return true }
+  return false
+}
+
+// Tish has no `delete` operator. Use `omit(obj, key)` to get a copy without
+// the named key, or `omitDeep(obj, [k1, k2, ...])` to remove a nested key.
+export fn omit(obj, key) {
+  let result = {}
+  let keys = Object.keys(obj)
+  let i = 0
+  while (i < keys.length) {
+    if (keys[i] !== key) { result[keys[i]] = obj[keys[i]] }
+    i = i + 1
+  }
+  return result
+}

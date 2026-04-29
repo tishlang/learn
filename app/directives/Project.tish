@@ -1,0 +1,29 @@
+// :::project{title=... time=... difficulty=... summary=...}
+//   <body markdown — what you'll build>
+// :::
+// Capstone hero card.
+
+import { useRef, useLayoutEffect } from "lattish"
+import { opt } from "../utils/objects.tish"
+
+export fn Project(props) {
+  let attrs = props.attrs
+  let bodyHtml = "bodyHtml" in props ? props.bodyHtml : ""
+  let title = opt(attrs, "title", "Project")
+  let time = opt(attrs, "time", "")
+  let difficulty = opt(attrs, "difficulty", "")
+  let summary = opt(attrs, "summary", "")
+  let bodyRef = useRef(null)
+  useLayoutEffect(() => {
+    if (bodyRef.current !== null) { bodyRef.current.innerHTML = bodyHtml }
+  }, null)
+  return <div class="dir-project">
+    <div class="dir-project-meta">
+      {time !== "" ? <span class="dir-project-chip">{"⏱ " + time}</span> : null}
+      {difficulty !== "" ? <span class="dir-project-chip">{difficulty}</span> : null}
+    </div>
+    <h1 class="dir-project-title">{title}</h1>
+    {summary !== "" ? <p class="dir-project-summary">{summary}</p> : null}
+    <div class="dir-project-body" ref={bodyRef} />
+  </div>
+}

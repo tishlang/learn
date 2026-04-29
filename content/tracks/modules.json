@@ -1,0 +1,42 @@
+{
+  "title": "Modules",
+  "description": "Deep-dives into the Tish ecosystem packages: Lattish (UI), tish-tailwind (CSS), tish-browser-server (in-browser shims), tish-creator (TishDoc markdown), tish-ide-panels (editor + runner).",
+  "parts": [
+    {
+      "title": "Lattish — UI runtime",
+      "chapters": [
+        { "id": "lattish/00-from-react", "title": "Coming from React", "summary": "Side-by-side cheat-sheet for React devs." },
+        { "id": "lattish/01-jsx-and-h", "title": "JSX and the h runtime", "summary": "How JSX lowers to a tree of vnodes." },
+        { "id": "lattish/02-hooks-state-and-refs", "title": "useState and useRef", "summary": "Reactive state, mutable handles, the hook-order rule." },
+        { "id": "lattish/03-effects-and-memo", "title": "Effects and memoization", "summary": "useEffect, useLayoutEffect, useMemo." },
+        { "id": "lattish/04-html-and-css", "title": "Lattish + HTML + CSS", "summary": "Choosing the right element; the four ways to apply styles." }
+      ]
+    },
+    {
+      "title": "tish-tailwind — utility CSS",
+      "chapters": [
+        { "id": "tish-tailwind/01-utilities-and-tw", "title": "Utilities and tw()", "summary": "Atomic CSS classes; the tw() helper." },
+        { "id": "tish-tailwind/02-emit-and-build", "title": "Emit and build", "summary": "Source scanner; integrating into your build." }
+      ]
+    },
+    {
+      "title": "tish-browser-server — in-browser shims",
+      "chapters": [
+        { "id": "tish-browser-server/01-overview-and-fs", "title": "Overview + virtual fs", "summary": "Architecture; IndexedDB-backed readFile/writeFile." },
+        { "id": "tish-browser-server/02-serve-with-sw", "title": "serve() via Service Worker", "summary": "Build a real REST API in a browser tab." }
+      ]
+    },
+    {
+      "title": "tish-creator — TishDoc markdown",
+      "chapters": [
+        { "id": "tish-creator/01-tishdoc-syntax", "title": "TishDoc syntax", "summary": "Frontmatter, directives, includes." }
+      ]
+    },
+    {
+      "title": "tish-ide-panels — editor + runner",
+      "chapters": [
+        { "id": "tish-ide-panels/01-editor-and-runner", "title": "Editor and runner", "summary": "EditorPanel, MiniRunner, runVm; build a REPL in 40 lines." }
+      ]
+    }
+  ]
+}

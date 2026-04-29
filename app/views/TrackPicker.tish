@@ -1,0 +1,90 @@
+// Pure view: receives track manifest as a prop instead of fetching with hooks.
+// All data hooks live in LearnApp so the global hookCursor is stable.
+
+import { navigate } from "../router.tish"
+import { completedChapters } from "../progress.tish"
+import { opt } from "../utils/objects.tish"
+
+fn TrackCard(props) {
+  let t = props.track
+  return <div class="ll-track-card" onclick={() => navigate(t.id, null)}>
+    <div class="ll-track-card-emoji">{t.emoji}</div>
+    <div class="ll-track-card-title">{t.title}</div>
+    <div class="ll-track-card-subtitle">{t.subtitle}</div>
+  </div>
+}
+
+fn TrackContents(props) {
+  let trackId = props.trackId
+  let manifest = props.manifest
+  if (manifest === null || manifest === undefined) {
+    return <div class="ll-loading">{"Loading…"}</div>
+  }
+  if (manifest.state === "loading") { return <div class="ll-loading">{"Loading…"}</div> }
+  if (manifest.state === "error") {
+    return <div class="ll-error-card">
+      <div class="ll-error-head">
+        <span class="ll-error-icon">{"!"}</span>
+        <span class="ll-error-title">{"Couldn't load track"}</span>
+      </div>
+      <pre class="ll-error-body">{String(manifest.error)}</pre>
+    </div>
+  }
+  let data = manifest.data
+  if (data === null) { return <div class="ll-error">{"No data"}</div> }
+  let parts = opt(data, "parts", [])
+  let done = completedChapters(trackId)
+  let sections = []
+  let p = 0
+  while (p < parts.length) {
+    let part = parts[p]
+    let chapters = opt(part, "chapters", [])
+    let cards = []
+    let i = 0
+    while (i < chapters.length) {
+      let c = chapters[i]
+      let cid = opt(c, "id", "")
+      let ctitle = opt(c, "title", cid)
+      let csub = opt(c, "summary", "")
+      let isDone = cid in done
+      cards.push(<div class={isDone ? "ll-chap-card ll-chap-card-done" : "ll-chap-card"} onclick={() => navigate(trackId, cid)}>
+        <div class="ll-chap-card-num">{String(i + 1)}</div>
+        <div class="ll-chap-card-body">
+          <div class="ll-chap-card-title">{(isDone ? "✓ " : "") + ctitle}</div>
+          <div class="ll-chap-card-summary">{csub}</div>
+        </div>
+      </div>)
+      i = i + 1
+    }
+    sections.push(<section class="ll-track-section">
+      <h2 class="ll-track-section-title">{opt(part, "title", "Part " + String(p + 1))}</h2>
+      <div class="ll-chap-grid">{cards}</div>
+    </section>)
+    p = p + 1
+  }
+  return <div class="ll-track-page">
+    <h1 class="ll-track-page-title">{opt(data, "title", trackId)}</h1>
+    <p class="ll-track-page-blurb">{opt(data, "description", "")}</p>
+    {sections}
+  </div>
+}
+
+export fn TrackPicker(props) {
+  let tracks = props.tracks
+  let focused = "focusedTrack" in props ? props.focusedTrack : null
+  let manifest = "manifest" in props ? props.manifest : null
+  if (focused !== null && focused !== undefined) {
+    return <TrackContents trackId={focused} manifest={manifest} />
+  }
+  let cards = []
+  let i = 0
+  while (i < tracks.length) {
+    cards.push(<TrackCard track={tracks[i]} />)
+    i = i + 1
+  }
+  return <div class="ll-home">
+    <h1 class="ll-home-title">{"Learn to code in Tish."}</h1>
+    <p class="ll-home-tagline">{"Three tracks, all in your browser. No backend, no terminal, no setup."}</p>
+    <div class="ll-home-tracks">{cards}</div>
+  </div>
+}

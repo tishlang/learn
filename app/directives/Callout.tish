@@ -1,0 +1,21 @@
+// :::callout{kind=info|tip|warn|danger|note title=...}
+//   Body markdown rendered into the callout box.
+
+import { useRef, useLayoutEffect } from "lattish"
+import { opt } from "../utils/objects.tish"
+
+export fn Callout(props) {
+  let kind = opt(props.attrs, "kind", "info")
+  let title = opt(props.attrs, "title", "")
+  let bodyHtml = props.bodyHtml
+  let bodyRef = useRef(null)
+  // null deps -> re-apply on every layout pass (DOM may have been remounted
+  // even when bodyHtml is unchanged).
+  useLayoutEffect(() => {
+    if (bodyRef.current !== null) { bodyRef.current.innerHTML = bodyHtml }
+  }, null)
+  return <aside class={"dir-callout dir-callout-" + kind}>
+    {title !== "" ? <div class="dir-callout-title">{title}</div> : null}
+    <div class="dir-callout-body" ref={bodyRef} />
+  </aside>
+}

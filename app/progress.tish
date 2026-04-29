@@ -1,0 +1,144 @@
+// Per-user progress: completion state per chapter + per directive (quiz, exercise).
+// Stored in localStorage as JSON.
+
+import { useState, useEffect } from "lattish"
+import { omit } from "./utils/objects.tish"
+
+const STORAGE_KEY = "tish-learn-progress"
+
+// Pub/sub: every mutation bumps `progressVersion` and notifies subscribers.
+// UI components opt into re-rendering on changes via `useProgressVersion()`.
+let progressVersion = 0
+let listeners = []
+
+fn notifyChange() {
+  progressVersion = progressVersion + 1
+  let snapshot = listeners
+  let i = 0
+  while (i < snapshot.length) {
+    let cb = snapshot[i]
+    if (cb !== null && cb !== undefined) {
+      try { cb(progressVersion) } catch (e) { }
+    }
+    i = i + 1
+  }
+}
+
+export fn subscribe(cb) {
+  listeners.push(cb)
+  return () => {
+    let i = 0
+    while (i < listeners.length) {
+      if (listeners[i] === cb) { listeners[i] = null; break }
+      i = i + 1
+    }
+  }
+}
+
+export fn getProgressVersion() { return progressVersion }
+
+// Hook: subscribes the calling component to progress changes. Returns the
+// current version number (rarely needed by callers — the value just changes
+// on every mutation, which forces a re-render of the consumer).
+export fn useProgressVersion() {
+  let st = useState(progressVersion)
+  let setV = st[1]
+  useEffect(() => {
+    return subscribe((v) => setV(v))
+  }, [])
+  return st[0]
+}
+
+fn read() {
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY)
+    if (raw === null) { return {} }
+    let p = JSON.parse(raw)
+    if (p === null || typeof p !== "object") { return {} }
+    return p
+  } catch (e) { return {} }
+}
+
+fn write(p) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch (e) { }
+  notifyChange()
+}
+
+export fn isComplete(track, chapter) {
+  let p = read()
+  if (!(track in p)) { return false }
+  let t = p[track]
+  if (!("chapters" in t)) { return false }
+  return chapter in t.chapters
+}
+
+export fn markComplete(track, chapter) {
+  let p = read()
+  if (!(track in p)) { p[track] = { chapters: {}, items: {} } }
+  if (!("chapters" in p[track])) { p[track].chapters = {} }
+  p[track].chapters[chapter] = { completedAt: Date.now() }
+  write(p)
+}
+
+export fn markIncomplete(track, chapter) {
+  let p = read()
+  if (!(track in p)) { return }
+  if (!("chapters" in p[track])) { return }
+  if (chapter in p[track].chapters) {
+    let t = p[track]
+    t.chapters = omit(t.chapters, chapter)
+    p[track] = t
+  }
+  write(p)
+}
+
+// Per-item state (quizzes, exercises, picks). Used by directive widgets to
+// remember pass/fail beyond a single render pass.
+export fn getItem(track, chapter, itemId) {
+  let p = read()
+  if (!(track in p)) { return null }
+  if (!("items" in p[track])) { return null }
+  let items = p[track].items
+  let key = chapter + "::" + itemId
+  if (!(key in items)) { return null }
+  return items[key]
+}
+
+export fn setItem(track, chapter, itemId, state) {
+  let p = read()
+  if (!(track in p)) { p[track] = { chapters: {}, items: {} } }
+  if (!("items" in p[track])) { p[track].items = {} }
+  let key = chapter + "::" + itemId
+  p[track].items[key] = state
+  write(p)
+}
+
+// All chapters completed in a track (returns Set-like object: { chapter: true }).
+export fn completedChapters(track) {
+  let p = read()
+  if (!(track in p)) { return {} }
+  if (!("chapters" in p[track])) { return {} }
+  let out = {}
+  let keys = Object.keys(p[track].chapters)
+  let i = 0
+  while (i < keys.length) {
+    out[keys[i]] = true
+    i = i + 1
+  }
+  return out
+}
+
+export fn allProgress() {
+  return read()
+}
+
+export fn resetTrack(track) {
+  let p = read()
+  if (track in p) { p = omit(p, track) }
+  write(p)
+}
+
+export fn resetAll() {
+  try { localStorage.removeItem(STORAGE_KEY) } catch (e) { }
+  notifyChange()
+}

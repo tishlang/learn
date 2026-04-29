@@ -1,0 +1,57 @@
+{
+  "title": "Capstones",
+  "description": "Build complete projects, all in your browser. Each ends with a one-line diff to deploy as a real Tish service.",
+  "parts": [
+    {
+      "title": "C1 — Real-time chat",
+      "chapters": [
+        { "id": "chat/01-client-ui", "title": "Client UI", "summary": "Lattish UI for messages, input, room name." },
+        { "id": "chat/02-realtime", "title": "Real-time sync", "summary": "BroadcastChannel-backed WebSocket shim." },
+        { "id": "chat/03-take-it-real", "title": "Take it real", "summary": "Diff to a deployable server." }
+      ]
+    },
+    {
+      "title": "C2 — Snake",
+      "chapters": [
+        { "id": "snake/01-grid-and-snake", "title": "Grid and snake", "summary": "Game state and canvas rendering." },
+        { "id": "snake/02-input-and-loop", "title": "Input and loop", "summary": "Arrow-key control, food, collision." },
+        { "id": "snake/03-juice-and-score", "title": "Juice and score", "summary": "Sound, particles, persistent high score." }
+      ]
+    },
+    {
+      "title": "C3 — Static blog generator",
+      "chapters": [
+        { "id": "blog/01-markdown-and-fs", "title": "Markdown + virtual fs", "summary": "Read .md from IndexedDB-backed disk." },
+        { "id": "blog/02-tishdoc-rendering", "title": "Markdown to HTML", "summary": "Tiny inline parser." },
+        { "id": "blog/03-templating-and-static-export", "title": "Templates and static pages", "summary": "Wrap each post; build an index." },
+        { "id": "blog/04-download-zip", "title": "Download as a real zip", "summary": "Pure-Tish store-zip writer." }
+      ]
+    },
+    {
+      "title": "C4 — Tiny REST API",
+      "chapters": [
+        { "id": "rest-api/01-design-and-routes", "title": "Design and routes", "summary": "CRUD verbs, status codes." },
+        { "id": "rest-api/02-persistence", "title": "Persistence", "summary": "IndexedDB-backed storage." },
+        { "id": "rest-api/03-client-and-take-it-real", "title": "Client + take it real", "summary": "Lattish UI calling the API; deploy diff." }
+      ]
+    },
+    {
+      "title": "C5 — Collaborative whiteboard",
+      "chapters": [
+        { "id": "whiteboard/01-canvas-strokes", "title": "Local strokes", "summary": "Canvas drawing + serialization." },
+        { "id": "whiteboard/02-broadcast-strokes", "title": "Broadcast strokes", "summary": "Multi-tab BroadcastChannel sync." },
+        { "id": "whiteboard/03-presence-and-webrtc", "title": "Presence + WebRTC", "summary": "Cursors, undo, cross-device peer-to-peer." }
+      ]
+    },
+    {
+      "title": "C6 — Tiny game engine",
+      "chapters": [
+        { "id": "game-engine/01-entity-component", "title": "Entity / Component", "summary": "ECS in 60 lines." },
+        { "id": "game-engine/02-renderer", "title": "Renderer", "summary": "Sprite atlas, batched draws." },
+        { "id": "game-engine/03-input-and-physics", "title": "Input and AABB physics", "summary": "Keyboard, gamepad, collision." },
+        { "id": "game-engine/04-scenes-and-sound", "title": "Scenes and sound", "summary": "Scene graph, audio cues." },
+        { "id": "game-engine/05-ship-a-game", "title": "Ship a platformer", "summary": "Full demo, exportable static site." }
+      ]
+    }
+  ]
+}

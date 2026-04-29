@@ -1,0 +1,95 @@
+// Pure-Tish CSS build for tish-learn.
+//   1. Scans app/** + content/** for Tailwind utility class names and emits
+//      only the ones that are actually used.
+//   2. Appends node_modules/tish-ide-panels/src/panels.css so the IDE-style
+//      :::sandbox{kind=ide} (EditorPanel, TerminalPanel, WebPreviewPanel,
+//      FileBrowserPanel) gets the pg-* styles it needs.
+//
+// Output: public/utilities.css (linked from public/index.html)
+// Run: tish run --feature fs --feature http build-css.tish
+
+import { fullStylesheet } from "tish-tailwind"
+import { readDir, readFile, writeFile } from "fs"
+
+fn isFileError(v) {
+  if (v === null) { return true }
+  if (typeof v === "object" && "error" in v) { return true }
+  return false
+}
+
+async fn tryRead(path) {
+  try {
+    let body = await readFile(path)
+    if (isFileError(body)) { return null }
+    return body
+  } catch (e) { return null }
+}
+
+async fn collectFiles(root, suffix, out) {
+  let entries = []
+  try { entries = await readDir(root) } catch (e) { return }
+  if (isFileError(entries)) { return }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    let p = root + "/" + name
+    if (name.indexOf(".") >= 0) {
+      if (p.endsWith(suffix)) { out.push(p) }
+    } else {
+      await collectFiles(p, suffix, out)
+    }
+    i = i + 1
+  }
+}
+
+let sources = []
+await collectFiles("app", ".tish", sources)
+await collectFiles("content", ".tishdoc.md", sources)
+await collectFiles("content", ".md", sources)
+console.log("scanning " + String(sources.length) + " source files for utility classes")
+
+// IDE-panel styles ship with the package. Read them so we can append — but
+// drop the leading global rules (`:root`, `*`, `html, body`) which would
+// otherwise overwrite tish-learn's typography, colors, and theme vars. The
+// component-scoped rules (`.pg-*`, `.hl-*`, `.scrollbar-thin`) are what we
+// actually need; everything before `.pg-root` is the package's standalone
+// dark theme + reset and doesn't belong in the lesson site.
+let panelsCss = await tryRead("node_modules/tish-ide-panels/src/panels.css")
+if (panelsCss === null) { panelsCss = "" }
+let firstScopedRule = panelsCss.indexOf(".pg-root")
+if (firstScopedRule > 0) { panelsCss = panelsCss.substring(firstScopedRule) }
+
+// Theme bridge: tish-ide-panels rules reference variables in the panels
+// namespace (--background, --foreground, --card, --muted-foreground, etc.).
+// Map each onto its closest tish-learn equivalent so editor + highlight
+// colors automatically track the System / Dark / Light toggle. Both `:root`
+// and `.theme-light` blocks are needed because `.theme-light` re-evaluates
+// the chained vars under the light theme.
+let themeBridge = ":root, .theme-light, .theme-dark {\n" +
+  "  --background: var(--bg);\n" +
+  "  --foreground: var(--text);\n" +
+  "  --card: var(--surface);\n" +
+  "  --secondary: var(--surface-hover);\n" +
+  "  --muted: var(--surface-hover);\n" +
+  "  --muted-foreground: var(--text-muted);\n" +
+  "  --chart-4: var(--accent);\n" +
+  "  --lattish-accent: var(--accent);\n" +
+  "  --theme-accent: var(--primary);\n" +
+  "}\n"
+
+// Skip the Tailwind Preflight reset. tish-learn ships its own typography
+// and global reset in public/base.css (linked before utilities.css), and
+// the Tailwind reset would otherwise wipe out heading sizes, link styles,
+// and the Inter body font we share with tishlang.com.
+let r = await fullStylesheet({
+  sourceFiles: sources,
+  preflightPath: "",
+  alwaysInclude: [
+    "mr-root", "mr-editor", "mr-controls", "mr-run", "mr-strip",
+    "mr-strip-idle", "mr-strip-out", "mr-strip-err", "mr-strip-ok", "mr-strip-fail",
+    "mr-strip-row", "mr-strip-col", "mr-strip-label", "mr-pre", "mr-checkmark"
+  ],
+  extraCss: themeBridge + "\n" + panelsCss
+})
+await writeFile("public/utilities.css", r.css)
+console.log("tish-tailwind: emitted public/utilities.css (" + String(r.includedCount) + " utilities + " + String(panelsCss.length) + "b panels.css)")

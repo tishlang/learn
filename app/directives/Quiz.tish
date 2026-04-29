@@ -1,0 +1,116 @@
+// :::quiz{id=...}
+// - prompt: <text>
+// - options: [a, b, c]
+// - answer: b
+// :::
+// Body uses a mini key:value subset to declare prompt + options + answer.
+
+import { useState } from "lattish"
+import { setItem, getItem } from "../progress.tish"
+import { opt } from "../utils/objects.tish"
+
+fn parseList(line) {
+  let s = line
+  let lb = s.indexOf("[")
+  let rb = s.lastIndexOf("]")
+  if (lb < 0 || rb < 0 || rb <= lb) { return [] }
+  let inner = s.substring(lb + 1, rb)
+  let parts = inner.split(",")
+  let out = []
+  let i = 0
+  while (i < parts.length) {
+    let p = parts[i]
+    let t = p
+    // trim
+    while (t.length > 0 && (t.charAt(0) === " " || t.charAt(0) === "\t")) { t = t.substring(1) }
+    while (t.length > 0 && (t.charAt(t.length - 1) === " " || t.charAt(t.length - 1) === "\t")) { t = t.substring(0, t.length - 1) }
+    // strip surrounding quotes
+    if (t.length >= 2 && (t.charAt(0) === "\"" || t.charAt(0) === "'")) {
+      let q = t.charAt(0)
+      if (t.charAt(t.length - 1) === q) { t = t.substring(1, t.length - 1) }
+    }
+    out.push(t)
+    i = i + 1
+  }
+  return out
+}
+
+fn parseQuizBody(body) {
+  let lines = body.split("\n")
+  let prompt = ""
+  let options = []
+  let answer = ""
+  let i = 0
+  while (i < lines.length) {
+    let line = lines[i]
+    let l = line
+    // trim leading "- " or whitespace
+    while (l.length > 0 && (l.charAt(0) === " " || l.charAt(0) === "\t" || l.charAt(0) === "-" || l.charAt(0) === "*")) {
+      l = l.substring(1)
+    }
+    while (l.length > 0 && l.charAt(0) === " ") { l = l.substring(1) }
+    let colon = l.indexOf(":")
+    if (colon > 0) {
+      let key = l.substring(0, colon)
+      let val = l.substring(colon + 1)
+      while (val.length > 0 && val.charAt(0) === " ") { val = val.substring(1) }
+      if (key === "prompt") { prompt = val }
+      else if (key === "options") { options = parseList(val) }
+      else if (key === "answer") { answer = val }
+    }
+    i = i + 1
+  }
+  return { prompt: prompt, options: options, answer: answer }
+}
+
+export fn Quiz(props) {
+  let attrs = props.attrs
+  let body = "body" in props ? props.body : ""
+  let track = props.track
+  let chapter = props.chapter
+  let id = opt(attrs, "id", "quiz-anon")
+  let parsed = parseQuizBody(body)
+
+  // Restore previous answer.
+  let prior = getItem(track, chapter, id)
+  let initialChoice = prior !== null && "choice" in prior ? prior.choice : null
+
+  let choiceState = useState(initialChoice)
+  let choice = choiceState[0]
+  let setChoice = choiceState[1]
+
+  fn pick(opt) {
+    setChoice(opt)
+    let passed = opt === parsed.answer
+    setItem(track, chapter, id, { choice: opt, passed: passed, at: Date.now() })
+  }
+
+  let buttons = []
+  let i = 0
+  while (i < parsed.options.length) {
+    let optTxt = parsed.options[i]
+    let isChosen = choice === optTxt
+    let isCorrect = optTxt === parsed.answer
+    let cls = "quiz-opt"
+    if (isChosen && isCorrect) { cls = "quiz-opt quiz-opt-correct" }
+    else if (isChosen && !isCorrect) { cls = "quiz-opt quiz-opt-wrong" }
+    else if (choice !== null && isCorrect) { cls = "quiz-opt quiz-opt-correct-hint" }
+    let captured = optTxt
+    buttons.push(<button class={cls} onclick={() => pick(captured)}>{captured}</button>)
+    i = i + 1
+  }
+
+  let feedback = null
+  if (choice !== null) {
+    let correct = choice === parsed.answer
+    feedback = <div class={correct ? "quiz-feedback quiz-feedback-ok" : "quiz-feedback quiz-feedback-fail"}>
+      {correct ? "Correct!" : "Try again — the highlighted answer is correct."}
+    </div>
+  }
+
+  return <div class="dir-quiz">
+    <div class="quiz-prompt">{parsed.prompt}</div>
+    <div class="quiz-opts">{buttons}</div>
+    {feedback}
+  </div>
+}

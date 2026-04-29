@@ -1,0 +1,361 @@
+// LessonView — fetches the chapter markdown, parses it, walks the AST, and
+// renders each node as either:
+//   - HTML (for headings/paragraphs/code/lists), via dangerouslySet innerHTML
+//   - a live Tish component (for ::pick / ::tryit / :::exercise / :::quiz /
+//     :::sandbox / :::callout / :::project)
+
+import { useRef, useLayoutEffect } from "lattish"
+import { parseDocument, blockToHtml } from "../tishdoc.tish"
+import { navigate } from "../router.tish"
+import { isComplete, markComplete, markIncomplete } from "../progress.tish"
+import { opt } from "../utils/objects.tish"
+
+import { Callout } from "../directives/Callout.tish"
+import { TryIt } from "../directives/TryIt.tish"
+import { Exercise } from "../directives/Exercise.tish"
+import { Quiz } from "../directives/Quiz.tish"
+import { Sandbox } from "../directives/Sandbox.tish"
+import { PickAssembler } from "../directives/Pick.tish"
+import { Project } from "../directives/Project.tish"
+
+fn HtmlBlock(props) {
+  let html = props.html
+  let elRef = useRef(null)
+  // Re-apply innerHTML on every layout pass: when the user navigates away
+  // and back, the DOM element is recreated even when `html` hasn't changed,
+  // so a [html]-deps effect would skip re-applying and leave the new <div>
+  // empty. Cost is negligible (a single innerHTML write).
+  useLayoutEffect(() => {
+    if (elRef.current !== null) { elRef.current.innerHTML = html }
+  }, null)
+  return <div class="ll-md" ref={elRef} />
+}
+
+// Parse `tokens=a,b,c` (with optional quotes) into an array.
+fn parseCsv(s) {
+  if (s === null || s === undefined || s === "") { return [] }
+  let parts = s.split(",")
+  let out = []
+  let i = 0
+  while (i < parts.length) {
+    let p = parts[i]
+    while (p.length > 0 && p.charAt(0) === " ") { p = p.substring(1) }
+    while (p.length > 0 && p.charAt(p.length - 1) === " ") { p = p.substring(0, p.length - 1) }
+    if (p.length > 0) { out.push(p) }
+    i = i + 1
+  }
+  return out
+}
+
+// Split a Pick `mode=assemble` body into tokens (whitespace-separated, but treat
+// quoted runs as single tokens so things like "Hello" stay one chip).
+fn tokenizeAssembleBody(body) {
+  let tokens = []
+  let i = 0
+  let buf = ""
+  let inStr = false
+  let strQ = ""
+  while (i < body.length) {
+    let c = body.charAt(i)
+    if (inStr) {
+      buf = buf + c
+      if (c === strQ) { inStr = false }
+      i = i + 1
+      continue
+    }
+    if (c === "\"" || c === "'") {
+      inStr = true
+      strQ = c
+      buf = buf + c
+      i = i + 1
+      continue
+    }
+    if (c === " " || c === "\t" || c === "\n" || c === "\r") {
+      if (buf.length > 0) { tokens.push(buf); buf = "" }
+      i = i + 1
+      continue
+    }
+    buf = buf + c
+    i = i + 1
+  }
+  if (buf.length > 0) { tokens.push(buf) }
+  return tokens
+}
+
+// Parse a `:::pick mode=blanks` body into { template, blanks }.
+// Body shape:
+//   <code with ___ blanks>
+//   ---
+//   - { at: 0, options: [let, const], answer: let }
+//   - { at: 1, options: [42, 0], answer: 42 }
+fn parseBlanksBody(body) {
+  let parts = body.split("\n---\n")
+  let template = parts[0]
+  let blanks = []
+  if (parts.length > 1) {
+    let lines = parts[1].split("\n")
+    let i = 0
+    while (i < lines.length) {
+      let line = lines[i]
+      // Extract content of `{...}`
+      let lb = line.indexOf("{")
+      let rb = line.lastIndexOf("}")
+      if (lb >= 0 && rb > lb) {
+        let inner = line.substring(lb + 1, rb)
+        // Crude key:value parse.
+        let kvParts = inner.split(",")
+        let entry = { at: -1, options: [], answer: "" }
+        let cur = ""
+        let depth = 0
+        let assembled = []
+        let j = 0
+        // First flatten — but we need to respect nested brackets in options [ ... ].
+        // Simpler: split on top-level commas only.
+        let tokens = []
+        let buf = ""
+        let bracketDepth = 0
+        let k = 0
+        while (k < inner.length) {
+          let ch = inner.charAt(k)
+          if (ch === "[") { bracketDepth = bracketDepth + 1; buf = buf + ch }
+          else if (ch === "]") { bracketDepth = bracketDepth - 1; buf = buf + ch }
+          else if (ch === "," && bracketDepth === 0) { tokens.push(buf); buf = "" }
+          else { buf = buf + ch }
+          k = k + 1
+        }
+        if (buf.length > 0) { tokens.push(buf) }
+        let m = 0
+        while (m < tokens.length) {
+          let kv = tokens[m]
+          let colon = kv.indexOf(":")
+          if (colon > 0) {
+            let key = kv.substring(0, colon)
+            let val = kv.substring(colon + 1)
+            // trim
+            while (key.length > 0 && key.charAt(0) === " ") { key = key.substring(1) }
+            while (key.length > 0 && key.charAt(key.length - 1) === " ") { key = key.substring(0, key.length - 1) }
+            while (val.length > 0 && val.charAt(0) === " ") { val = val.substring(1) }
+            while (val.length > 0 && val.charAt(val.length - 1) === " ") { val = val.substring(0, val.length - 1) }
+            if (key === "at") { entry.at = parseInt(val, 10) }
+            else if (key === "options") {
+              // val is "[a, b, c]"
+              let vlb = val.indexOf("[")
+              let vrb = val.lastIndexOf("]")
+              if (vlb >= 0 && vrb > vlb) {
+                let inside = val.substring(vlb + 1, vrb)
+                let vparts = inside.split(",")
+                let p2 = 0
+                while (p2 < vparts.length) {
+                  let q = vparts[p2]
+                  while (q.length > 0 && q.charAt(0) === " ") { q = q.substring(1) }
+                  while (q.length > 0 && q.charAt(q.length - 1) === " ") { q = q.substring(0, q.length - 1) }
+                  if (q.length > 0) { entry.options.push(q) }
+                  p2 = p2 + 1
+                }
+              }
+            }
+            else if (key === "answer") { entry.answer = val }
+          }
+          m = m + 1
+        }
+        if (entry.options.length > 0) { blanks.push(entry) }
+      }
+      i = i + 1
+    }
+  }
+  return { template: template, blanks: blanks }
+}
+
+fn renderBlock(block, track, chapter) {
+  if (block.kind === "directive_block" || block.kind === "directive_leaf") {
+    let name = block.name
+    let attrs = block.attrs
+    let body = "body" in block ? block.body : ""
+
+    // Each directive uses its `id` attr (when present) as the Lattish `key`
+    // so navigating between lessons gives every directive a fresh scope
+    // rather than reusing state slots from a same-position directive in the
+    // previously-rendered lesson. For directives without an id we fall back
+    // to a per-lesson + position key so identity is still stable.
+    let posKey = (track !== null ? track : "") + "/" + (chapter !== null ? chapter : "") + "/" + name
+    if (name === "callout") {
+      let bodyParsed = parseDocument(body)
+      let bodyHtml = ""
+      let i = 0
+      while (i < bodyParsed.length) {
+        if (bodyParsed[i].kind !== "frontmatter") {
+          bodyHtml = bodyHtml + blockToHtml(bodyParsed[i])
+        }
+        i = i + 1
+      }
+      return <Callout key={opt(attrs, "id", posKey)} attrs={attrs} bodyHtml={bodyHtml} />
+    }
+    if (name === "tryit") {
+      return <TryIt key={opt(attrs, "id", posKey)} attrs={attrs} body={body} />
+    }
+    if (name === "exercise") {
+      return <Exercise key={opt(attrs, "id", posKey)} attrs={attrs} body={body} track={track} chapter={chapter} />
+    }
+    if (name === "quiz") {
+      return <Quiz key={opt(attrs, "id", posKey)} attrs={attrs} body={body} track={track} chapter={chapter} />
+    }
+    if (name === "sandbox") {
+      return <Sandbox key={opt(attrs, "id", posKey)} attrs={attrs} body={body} />
+    }
+    if (name === "project") {
+      let bodyParsed = parseDocument(body)
+      let bodyHtml = ""
+      let i = 0
+      while (i < bodyParsed.length) {
+        if (bodyParsed[i].kind !== "frontmatter") { bodyHtml = bodyHtml + blockToHtml(bodyParsed[i]) }
+        i = i + 1
+      }
+      return <Project key={opt(attrs, "id", posKey)} attrs={attrs} bodyHtml={bodyHtml} />
+    }
+    if (name === "pick") {
+      let mode = opt(attrs, "mode", "assemble")
+      let expected = opt(attrs, "expected-output", null)
+      if (expected === null) { expected = opt(attrs, "expected", null) }
+      if (expected !== null && expected.indexOf("\\n") >= 0) { expected = expected.split("\\n").join("\n") }
+      let onPass = () => { markComplete(track, chapter) }
+      let pickId = opt(attrs, "id", posKey)
+      if (mode === "blanks") {
+        let parsed = parseBlanksBody(body)
+        return <PickAssembler
+          key={pickId}
+          id={pickId}
+          mode="blanks"
+          template={parsed.template}
+          blanks={parsed.blanks}
+          expected={expected}
+          onPass={onPass} />
+      }
+      // assemble mode
+      // Body's first token-bearing portion is the canonical sequence; everything
+      // after a line "distractors:" is the distractor list (CSV).
+      let canonical = body
+      let distractors = []
+      let distIdx = body.indexOf("distractors:")
+      if (distIdx >= 0) {
+        canonical = body.substring(0, distIdx)
+        let after = body.substring(distIdx + 12)
+        // up to end of line
+        let nl = after.indexOf("\n")
+        let csv = nl >= 0 ? after.substring(0, nl) : after
+        distractors = parseCsv(csv)
+      }
+      let tokens = tokenizeAssembleBody(canonical)
+      return <PickAssembler
+        key={pickId}
+        id={pickId}
+        mode="assemble"
+        tokens={tokens}
+        distractors={distractors}
+        expected={expected}
+        onPass={onPass} />
+    }
+    // Unknown directive: render its body as plain HTML so authors see something.
+    return <div class="ll-unknown-directive">
+      <div class="ll-unknown-directive-name">{":::" + name}</div>
+      <pre>{body}</pre>
+    </div>
+  }
+
+  if (block.kind === "frontmatter") {
+    return null
+  }
+
+  return <HtmlBlock html={blockToHtml(block)} />
+}
+
+fn LessonHeader(props) {
+  let track = props.track
+  let chapter = props.chapter
+  let frontmatter = props.frontmatter
+  let title = ""
+  if (frontmatter !== null && frontmatter !== "") {
+    let lines = frontmatter.split("\n")
+    let i = 0
+    while (i < lines.length) {
+      let line = lines[i]
+      let colon = line.indexOf(":")
+      if (colon > 0) {
+        let key = line.substring(0, colon)
+        let val = line.substring(colon + 1)
+        while (val.length > 0 && val.charAt(0) === " ") { val = val.substring(1) }
+        if (val.length >= 2 && val.charAt(0) === "\"" && val.charAt(val.length - 1) === "\"") {
+          val = val.substring(1, val.length - 1)
+        }
+        if (key === "title") { title = val }
+      }
+      i = i + 1
+    }
+  }
+  let done = isComplete(track, chapter)
+  fn toggle() {
+    if (done) { markIncomplete(track, chapter) }
+    else { markComplete(track, chapter) }
+  }
+  return <div class="ll-lesson-header">
+    <div class="ll-lesson-trail">
+      <button class="ll-lesson-back" onclick={() => navigate(track, null)}>{"← " + track}</button>
+      <span class="ll-lesson-chapter">{chapter}</span>
+    </div>
+    {title !== "" ? <h1 class="ll-lesson-title">{title}</h1> : null}
+    <div class="ll-lesson-actions">
+      <button
+        class={done ? "ll-mark-done ll-mark-done-on" : "ll-mark-done"}
+        onclick={toggle}
+        title={done ? "Click to mark this chapter as not complete" : "Click to mark this chapter as complete"}>
+        {done ? "✓ Marked complete · click to undo" : "Mark complete"}
+      </button>
+    </div>
+  </div>
+}
+
+export fn LessonView(props) {
+  // Pure view: text + parsed AST come from LearnApp via props (data hooks
+  // live there to keep the global hookCursor stable across route changes).
+  let track = props.track
+  let chapter = props.chapter
+  let res = props.res
+  let parsed = props.parsed
+  if (res === null || res === undefined) { res = { state: "idle", text: "", error: "" } }
+  if (parsed === null || parsed === undefined) { parsed = [] }
+
+  if (res.state === "loading") { return <div class="ll-loading">{"Loading lesson…"}</div> }
+  if (res.state === "error") {
+    return <div class="ll-error-card">
+      <div class="ll-error-head">
+        <span class="ll-error-icon">{"!"}</span>
+        <span class="ll-error-title">{"Couldn't load lesson"}</span>
+      </div>
+      <pre class="ll-error-body">{String(res.error)}</pre>
+      <div class="ll-error-hint">{"Try picking another chapter from the sidebar, or refresh the page."}</div>
+    </div>
+  }
+  if (res.state === "idle" || res.text === "") {
+    return <div class="ll-loading">{"Pick a chapter from the sidebar."}</div>
+  }
+
+  let frontmatter = ""
+  let i = 0
+  while (i < parsed.length) {
+    if (parsed[i].kind === "frontmatter") { frontmatter = parsed[i].text; break }
+    i = i + 1
+  }
+  let blocks = []
+  let j = 0
+  while (j < parsed.length) {
+    let b = parsed[j]
+    if (b.kind !== "frontmatter") {
+      blocks.push(renderBlock(b, track, chapter))
+    }
+    j = j + 1
+  }
+
+  return <article class="ll-lesson">
+    <LessonHeader track={track} chapter={chapter} frontmatter={frontmatter} />
+    <div class="ll-lesson-body">{blocks}</div>
+  </article>
+}

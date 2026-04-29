@@ -1,0 +1,175 @@
+// :::sandbox{kind=console|ide id=... files="main.tish,lib.tish"}
+//   <starter file 1>
+//   ---FILE: lib.tish---
+//   <starter file 2>
+// :::
+// kind=console -> editor + terminal (runs through bytecode VM)
+// kind=ide     -> editor + terminal + web preview iframe (compiles to JS)
+
+import { useState, useRef, useLayoutEffect } from "lattish"
+import {
+  EditorPanel,
+  TerminalPanel,
+  WebPreviewPanel,
+  FileBrowserPanel,
+  runCompileAndExec
+} from "tish-ide-panels"
+import { opt } from "../utils/objects.tish"
+
+const FILE_SPLIT = "---FILE:"
+
+fn parseBodyFiles(body, defaultPath) {
+  let files = []
+  let lines = body.split("\n")
+  let current = { path: defaultPath, buf: [] }
+  let i = 0
+  while (i < lines.length) {
+    let line = lines[i]
+    let trimmed = line
+    while (trimmed.length > 0 && trimmed.charAt(0) === " ") { trimmed = trimmed.substring(1) }
+    if (trimmed.length > FILE_SPLIT.length && trimmed.substring(0, FILE_SPLIT.length) === FILE_SPLIT) {
+      // Push current and start a new file.
+      let endMarker = trimmed.indexOf("---", FILE_SPLIT.length)
+      let pathName = trimmed.substring(FILE_SPLIT.length, endMarker > 0 ? endMarker : trimmed.length)
+      while (pathName.length > 0 && pathName.charAt(0) === " ") { pathName = pathName.substring(1) }
+      while (pathName.length > 0 && pathName.charAt(pathName.length - 1) === " ") { pathName = pathName.substring(0, pathName.length - 1) }
+      files.push({ path: current.path, text: current.buf.join("\n") })
+      current = { path: pathName, buf: [] }
+    } else {
+      current.buf.push(line)
+    }
+    i = i + 1
+  }
+  files.push({ path: current.path, text: current.buf.join("\n") })
+  return files
+}
+
+export fn Sandbox(props) {
+  let attrs = props.attrs
+  let body = "body" in props ? props.body : ""
+  let kind = opt(attrs, "kind", "console")
+  let defaultPath = "main.tish"
+  let files = parseBodyFiles(body, defaultPath)
+  let entriesRef = useRef(files)
+
+  let pathState = useState(files[0].path)
+  let currentPath = pathState[0]
+  let setCurrentPath = pathState[1]
+  let editorApi = useRef(null)
+  let terminalApi = useRef(null)
+  let previewApi = useRef(null)
+  let previewState = useRef(null)
+  let runIdRef = useRef(0)
+  let runBtnRef = useRef(null)
+
+  fn findEntry(p) {
+    let i = 0
+    while (i < entriesRef.current.length) {
+      if (entriesRef.current[i].path === p) { return entriesRef.current[i] }
+      i = i + 1
+    }
+    return null
+  }
+
+  fn handleRun() {
+    let cur = findEntry(currentPath)
+    if (cur === null) { return }
+    if (editorApi.current !== null) { cur.text = editorApi.current.getContent() }
+    let webPreview = kind === "ide"
+    if (runBtnRef.current !== null) {
+      runBtnRef.current.disabled = true
+      runBtnRef.current.textContent = "Running…"
+    }
+    runCompileAndExec({
+      files: entriesRef.current,
+      entryPath: webPreview ? findIdeEntry(entriesRef.current) : currentPath,
+      webPreview: webPreview,
+      terminal: terminalApi.current,
+      preview: previewApi.current,
+      runIdRef: runIdRef,
+      onDoneBtnRef: runBtnRef,
+      cssEntryPath: null
+    })
+  }
+
+  fn findIdeEntry(arr) {
+    let i = 0
+    while (i < arr.length) {
+      if (arr[i].path === "main.tish") { return arr[i].path }
+      i = i + 1
+    }
+    return arr[0].path
+  }
+
+  fn onSelect(p) {
+    let curEntry = findEntry(currentPath)
+    if (curEntry !== null && editorApi.current !== null) {
+      curEntry.text = editorApi.current.getContent()
+    }
+    setCurrentPath(p)
+    let next = findEntry(p)
+    if (next !== null && editorApi.current !== null) {
+      editorApi.current.setContent(next.text, p)
+    }
+  }
+
+  // Console-mode listener: pipe iframe console.* messages back via postMessage.
+  useLayoutEffect(() => {
+    fn onMsg(ev) {
+      let d = ev.data
+      if (d === null || typeof d !== "object") { return }
+      if (!("type" in d)) { return }
+      if (d["type"] !== "tish-console") { return }
+      if (terminalApi.current === null) { return }
+      if (d["id"] !== runIdRef.current) { return }
+      let line = "line" in d ? d["line"] : ""
+      terminalApi.current.appendLine(line)
+    }
+    window.addEventListener("message", onMsg)
+    return () => window.removeEventListener("message", onMsg)
+  }, [])
+
+  let paths = []
+  let i = 0
+  while (i < files.length) { paths.push(files[i].path); i = i + 1 }
+  let curEntry = findEntry(currentPath)
+
+  let header = <div class="dir-sandbox-header">
+    <span class="dir-sandbox-badge">{kind === "ide" ? "Sandbox · IDE" : "Sandbox · Console"}</span>
+    <button ref={runBtnRef} class="dir-sandbox-run" onclick={handleRun}>{"Run"}</button>
+  </div>
+
+  if (kind === "ide") {
+    return <div class="dir-sandbox dir-sandbox-ide">
+      {header}
+      <div class="dir-sandbox-body">
+        <div class="dir-sandbox-left">
+          {files.length > 1 ? FileBrowserPanel(paths, currentPath, onSelect) : null}
+          <div class="dir-sandbox-editor">
+            {EditorPanel(editorApi, curEntry !== null ? curEntry.text : "", currentPath, null, null)}
+          </div>
+        </div>
+        <div class="dir-sandbox-right">
+          <div class="dir-sandbox-preview">
+            {WebPreviewPanel(previewApi, previewState)}
+          </div>
+          <div class="dir-sandbox-terminal">
+            {TerminalPanel(terminalApi)}
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  return <div class="dir-sandbox dir-sandbox-console">
+    {header}
+    <div class="dir-sandbox-body">
+      <div class="dir-sandbox-editor">
+        {EditorPanel(editorApi, curEntry !== null ? curEntry.text : "", currentPath, null, null)}
+      </div>
+      <div class="dir-sandbox-terminal">
+        {TerminalPanel(terminalApi)}
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,32 @@
+// :::exercise{id=ex-greet expected="Hello, Ada"}
+//   <starter code in body>
+// :::
+// Wraps MiniRunner with expected output. On pass, marks complete in progress.
+
+import { MiniRunner } from "tish-ide-panels"
+import { markComplete, setItem } from "../progress.tish"
+import { opt } from "../utils/objects.tish"
+
+export fn Exercise(props) {
+  let attrs = props.attrs
+  let body = "body" in props ? props.body : ""
+  let track = props.track
+  let chapter = props.chapter
+  let id = opt(attrs, "id", "ex-anon")
+  let expected = opt(attrs, "expected", null)
+  // Allow `\n` literals in attribute values to expand to real newlines.
+  if (expected !== null && expected.indexOf("\\n") >= 0) {
+    expected = expected.split("\\n").join("\n")
+  }
+  let onPass = () => {
+    setItem(track, chapter, id, { passed: true, at: Date.now() })
+    markComplete(track, chapter)
+  }
+  return <div class="dir-exercise">
+    <div class="dir-exercise-header">
+      <span class="dir-exercise-badge">{"Exercise"}</span>
+      {expected !== null ? <span class="dir-exercise-hint">{"Match the expected output"}</span> : null}
+    </div>
+    <MiniRunner key={id} initialCode={body} expected={expected} onPass={onPass} apiRef={null} />
+  </div>
+}
