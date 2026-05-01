@@ -2,6 +2,7 @@
 // Routes #/, #/<track>, #/<track>/<chapter>.
 
 import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
+import { StandalonePage } from "tish-ide-panels"
 import { useRoute, navigate, navigateRaw } from "./router.tish"
 import { useJsonResource, useTextResource, chapterUrl, trackManifestUrl } from "./content_loader.tish"
 import { completedChapters, useProgressVersion } from "./progress.tish"
@@ -74,6 +75,24 @@ fn themeLabel(t) {
   return "System"
 }
 
+// True if `id` follows the convention used for sub-chapters of a section
+// overview — digits, then a single letter, then a dash. E.g. `26a-tish-run`
+// is a child of `26-build-targets`. Used by the sidebar to indent children
+// underneath their parent overview entry.
+fn isSubChapter(id) {
+  if (id === null || id === undefined || id.length === 0) { return false }
+  let i = 0
+  while (i < id.length && id.charAt(i) >= "0" && id.charAt(i) <= "9") {
+    i = i + 1
+  }
+  if (i === 0) { return false }
+  if (i + 1 >= id.length) { return false }
+  let c = id.charAt(i)
+  let isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+  if (!isLetter) { return false }
+  return id.charAt(i + 1) === "-"
+}
+
 fn TrackSidebar(props) {
   let trackId = props.trackId
   let currentChapter = props.currentChapter
@@ -110,6 +129,7 @@ fn TrackSidebar(props) {
       let isCurrent = currentChapter === cid
       let isDone = cid in done
       let cls = "ll-chap"
+      if (isSubChapter(cid)) { cls = cls + " ll-chap-nested" }
       if (isCurrent) { cls = cls + " ll-chap-current" }
       if (isDone) { cls = cls + " ll-chap-done" }
       let label = ctitle
@@ -247,6 +267,14 @@ export fn LearnApp() {
     if (chapterRes.state !== "ready") { return [] }
     return parseDocument(chapterRes.text)
   }, [chapterRes.text, chapterRes.state])
+
+  // Sandbox route is full-screen: bypass the header/sidebar so the standalone
+  // SandboxIde owns the whole viewport (matches tish-playground's chrome).
+  if (route.view === "sandbox") {
+    return <div class="ll-app ll-app-sandbox">
+      {StandalonePage({})}
+    </div>
+  }
 
   let main = null
   if (route.view === "home") {

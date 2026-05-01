@@ -19,7 +19,9 @@ This part of the curriculum has **one chapter per exit**, so you can dig into th
 | [`tish build --target wasm`](/tish-deep/26f-target-wasm) | `.wasm` + glue `.js` for browsers | Sandboxed in-browser apps, Workers | ❌ |
 | [`tish build --target wasi`](/tish-deep/26g-target-wasi) | One self-contained `.wasm` module | Edge runtimes, serverless, Wasmtime | ❌ |
 
-## Two big mental groups
+## Three big mental groups
+
+All those exits cluster into three groups based on **what actually runs your code at runtime**. That's the question that decides which native modules you can use, how big your artifact is, and what kind of debugging story you get.
 
 ### Group 1 — runs *Rust* code that uses `tishlang_runtime`
 
@@ -31,7 +33,13 @@ If your program touches anything Rust-shaped — AppKit windows, GPU shaders, Po
 
 Cranelift, LLVM, WASM, and WASI all do roughly the same thing: pre-compile your source to bytecode, embed that blob inside a host (a native binary, a WASM module), and run the **same `tishlang_vm`** at start-up. This is **pure Tish** — no `tish:*` native imports, no `cargo:` crates — but the artifacts are tiny, sandboxable, and quick to build.
 
-`tish build --target js` is its own animal: no Tish runtime ships with it; the host JavaScript engine *is* the runtime.
+The four exits in this group differ only in their wrapper: a Cranelift- or LLVM-linked native binary, a browser-shaped `.wasm` + glue, or a self-contained WASI module. The Tish code in the middle is byte-identical.
+
+### Group 3 — runs as JavaScript on the host engine
+
+`tish build --target js` is the odd one out: **no Tish runtime ships with the artifact at all**. Your `.tish` source is transpiled to a JavaScript bundle, and whatever JS engine the host already has (V8, JavaScriptCore, SpiderMonkey, QuickJS) runs it directly. That makes the artifact the smallest of any path and gives you the host engine's JIT for free, but it also means no `tish:*` modules, no `cargo:` imports, and any host-platform behavior (numeric edge cases, async timing) is whatever JavaScript does.
+
+This is the path **this site itself uses** — the lessons you're reading run as a JS bundle in your browser tab.
 
 ## How to pick
 

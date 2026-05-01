@@ -5,6 +5,7 @@
 
 import { useRef, useLayoutEffect } from "lattish"
 import { opt } from "../utils/objects.tish"
+import { InlineMd } from "../InlineMd.tish"
 
 export fn Project(props) {
   let attrs = props.attrs
@@ -22,8 +23,8 @@ export fn Project(props) {
       {time !== "" ? <span class="dir-project-chip">{"⏱ " + time}</span> : null}
       {difficulty !== "" ? <span class="dir-project-chip">{difficulty}</span> : null}
     </div>
-    <h1 class="dir-project-title">{title}</h1>
-    {summary !== "" ? <p class="dir-project-summary">{summary}</p> : null}
+    <InlineMd tag="h1" cls="dir-project-title" text={title} />
+    {summary !== "" ? <InlineMd tag="p" cls="dir-project-summary" text={summary} /> : null}
     <div class="dir-project-body" ref={bodyRef} />
   </div>
 }

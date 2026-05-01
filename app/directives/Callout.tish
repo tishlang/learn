@@ -3,6 +3,7 @@
 
 import { useRef, useLayoutEffect } from "lattish"
 import { opt } from "../utils/objects.tish"
+import { InlineMd } from "../InlineMd.tish"
 
 export fn Callout(props) {
   let kind = opt(props.attrs, "kind", "info")
@@ -15,7 +16,7 @@ export fn Callout(props) {
     if (bodyRef.current !== null) { bodyRef.current.innerHTML = bodyHtml }
   }, null)
   return <aside class={"dir-callout dir-callout-" + kind}>
-    {title !== "" ? <div class="dir-callout-title">{title}</div> : null}
+    {title !== "" ? <InlineMd tag="div" cls="dir-callout-title" text={title} /> : null}
     <div class="dir-callout-body" ref={bodyRef} />
   </aside>
 }

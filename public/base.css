@@ -45,6 +45,9 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 /* App shell */
 .ll-app { display: flex; flex-direction: column; min-height: 100vh; }
+/* /sandbox route: full-screen embed of SandboxIde from tish-ide-panels. */
+.ll-app-sandbox { height: 100vh; min-height: 100vh; overflow: hidden; }
+.ll-app-sandbox > .pg-root { flex: 1; min-height: 0; }
 .ll-header {
   display: flex; align-items: center; gap: 1rem;
   padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
@@ -106,6 +109,26 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 .ll-chap:hover { background: var(--surface-hover); }
 .ll-chap-current { background: var(--primary-soft); }
 .ll-chap-done { color: var(--text-muted); }
+/* Sub-chapters of a section-overview entry (e.g. 26a-26g under 26-build-
+   targets). Indented + accented with a thin left guide so the parent /
+   child relationship is obvious at a glance. */
+.ll-chap-nested {
+  padding-left: 1.6rem;
+  font-size: 0.82rem;
+  position: relative;
+}
+.ll-chap-nested::before {
+  content: "";
+  position: absolute;
+  left: 0.85rem;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: var(--border);
+}
+.ll-chap-nested.ll-chap-current::before {
+  background: var(--primary);
+}
 
 .ll-main { flex: 1; min-width: 0; overflow-y: auto; }
 
@@ -258,6 +281,22 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 .ll-md > * { margin-top: 0; margin-bottom: 0.85rem; }
 .ll-md > *:last-child { margin-bottom: 0; }
+.ll-lesson-body .md-quote {
+  margin: 0 0 0.85rem 0;
+  padding: 0.5rem 0.9rem;
+  color: var(--text-muted);
+  border-left: 3px solid color-mix(in oklch, var(--accent) 70%, transparent);
+  background: color-mix(in oklch, var(--bg) 80%, var(--surface));
+  border-radius: 0 6px 6px 0;
+}
+.ll-lesson-body .md-quote > *:last-child { margin-bottom: 0; }
+.ll-lesson-body .md-quote a { color: var(--text); }
+.ll-lesson-body .md-hr {
+  border: 0;
+  height: 1px;
+  margin: 1.25rem 0;
+  background: var(--border);
+}
 .ll-lesson-body .md-table {
   width: 100%;
   border-collapse: collapse;

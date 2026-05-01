@@ -1,16 +1,47 @@
-// Minimal TishDoc-flavored Markdown parser. Tailored to what tish-learn lesson
-// files need: ATX headings, paragraphs, fenced code, block / leaf directives,
-// frontmatter, inline `code` and **bold**.
+// TishDoc-flavored Markdown parser. Tailored to what tish-learn lesson files
+// need; intentionally a CommonMark/GFM subset. Output is plugged into the DOM
+// via innerHTML, so every raw character is HTML-escaped on the way out.
+//
+// Block-level features:
+//   - YAML/JSON frontmatter (`---` … `---` at the top of the file)
+//   - ATX headings (`#` … `######` followed by a space)
+//   - Fenced code blocks with optional language tag
+//   - Block directives `:::name{attrs}` … `:::` and leaf directives `::name{attrs}`
+//   - Unordered lists (`-` / `*`) and ordered lists (`1.` / `2.` / …)
+//   - GFM tables (header row + `|---|` separator + body rows)
+//   - Blockquotes (`> text`, multi-line; recursively parsed so a quote can
+//     contain headings / lists / nested quotes)
+//   - Horizontal rules (`---`, `***`, or `___` on a line by themselves)
+//   - Paragraphs (anything else, joined until a blank line or another block
+//     starts)
+//
+// Inline features (run on heading / paragraph / list-item / table-cell /
+// blockquote text):
+//   - Backslash escapes for punctuation: `\*`, `\_`, `` \` ``, `\\`, `\[`, etc.
+//   - Inline code spans: `` `foo` ``
+//   - Bold: `**foo**` and `__foo__`
+//   - Italic: `*foo*` and `_foo_` (the underscore form respects word
+//     boundaries, so identifiers like `foo_bar_baz` don't get clobbered)
+//   - Strikethrough: `~~foo~~` (GFM)
+//   - Links: `[label](url)` (external URLs get an `ll-link-ext` class +
+//     `target="_blank"` automatically)
+//   - Autolinks: `<https://…>`, `<http://…>`, `<mailto:…>`
+//   - Images: `![alt](url)`
+//   - Hard line break: trailing `  ` before a newline → `<br>`. Bare newlines
+//     are kept as soft breaks (whitespace) the way CommonMark does.
 //
 // The parser returns a flat array of block nodes; LessonView iterates and
-// renders each block (Markdown ones to HTML strings, directives to live
-// Tish components like MiniRunner / PickAssembler / Quiz).
+// renders each block (Markdown ones to HTML strings via blockToHtml,
+// directives to live Tish components like MiniRunner / PickAssembler / Quiz).
 //
 // Block node shapes:
 //   { kind: "heading", level: int, text: string }
 //   { kind: "paragraph", text: string }
 //   { kind: "list", ordered: bool, items: [string] }
 //   { kind: "code",  lang: string, text: string }
+//   { kind: "table", header: [string], rows: [[string]] }
+//   { kind: "blockquote", children: [block] }
+//   { kind: "hr" }
 //   { kind: "directive_block", name: string, attrs: {...}, body: string }
 //   { kind: "directive_leaf",  name: string, attrs: {...} }
 //   { kind: "frontmatter", text: string }   // YAML/JSON, not parsed further
@@ -19,6 +50,11 @@ import { highlightToHtml } from "tish-ide-panels"
 
 fn isWs(c) {
   return c === " " || c === "\t" || c === "\r" || c === "\n"
+}
+
+fn isAlphaNum(c) {
+  if (c === null || c === undefined || c.length === 0) { return false }
+  return (c >= "0" && c <= "9") || (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
 }
 
 fn ltrim(s) {
@@ -133,6 +169,60 @@ fn parseDirectiveHead(line) {
   return { fence: fence, name: name, attrs: attrs }
 }
 
+// True for a blockquote line — `>` optionally followed by a space, allowing
+// content after. Bare `>` on a line is also accepted (an "empty" quoted line).
+fn isBlockquoteLine(line) {
+  let s = ltrim(line)
+  if (s.length === 0) { return false }
+  if (s.charAt(0) !== ">") { return false }
+  return s.length === 1 || s.charAt(1) === " "
+}
+
+// Strip the leading `> ` (or `>`) from a blockquote line. Used to peel one
+// level of quoting before recursing into parseDocument on the inner body.
+fn stripBlockquoteMarker(line) {
+  let s = ltrim(line)
+  if (s.length === 0 || s.charAt(0) !== ">") { return s }
+  let rest = s.substring(1)
+  if (rest.length > 0 && rest.charAt(0) === " ") { rest = rest.substring(1) }
+  return rest
+}
+
+// True for a horizontal-rule line — three or more `-`, `*`, or `_` (the same
+// character throughout) optionally separated by spaces, e.g. `---`, `* * *`,
+// `___`. The opening `-` on a list item (`- foo`) is ruled out because the
+// list parser runs first and `- foo` contains a non-rule character.
+fn isHorizontalRule(line) {
+  let s = trim(line)
+  if (s.length < 3) { return false }
+  let c = s.charAt(0)
+  if (c !== "-" && c !== "*" && c !== "_") { return false }
+  let count = 0
+  let i = 0
+  while (i < s.length) {
+    let ch = s.charAt(i)
+    if (ch === c) { count = count + 1 }
+    else if (ch !== " " && ch !== "\t") { return false }
+    i = i + 1
+  }
+  return count >= 3
+}
+
+// Recognise an ordered-list marker like `1. ` / `12. ` at the start of a line.
+// Returns the rest of the line (the item body) or null if the line isn't one.
+fn parseOrderedItem(line) {
+  let s = ltrim(line)
+  let i = 0
+  while (i < s.length && s.charAt(i) >= "0" && s.charAt(i) <= "9") {
+    i = i + 1
+  }
+  if (i === 0) { return null }
+  if (i + 1 >= s.length) { return null }
+  if (s.charAt(i) !== ".") { return null }
+  if (s.charAt(i + 1) !== " ") { return null }
+  return s.substring(i + 2)
+}
+
 // Parse a single Markdown-table row: `| a | b | c |` -> ["a", "b", "c"].
 fn parseTableRow(line) {
   let s = ltrim(line)
@@ -208,6 +298,28 @@ export fn parseDocument(src) {
     // Blank line
     if (trim(line) === "") { i = i + 1; continue }
 
+    // Horizontal rule (`---`, `***`, `___`). Frontmatter has already been
+    // stripped at this point, so a `---` in the body is unambiguous.
+    if (isHorizontalRule(line)) {
+      blocks.push({ kind: "hr" })
+      i = i + 1
+      continue
+    }
+
+    // Blockquote. We collect the contiguous run of `>` lines, peel the marker
+    // off each, and recursively parse the inner body so a quote can contain
+    // headings, lists, code, or even nested quotes.
+    if (isBlockquoteLine(line)) {
+      let qbuf = []
+      while (i < lines.length && isBlockquoteLine(lines[i])) {
+        qbuf.push(stripBlockquoteMarker(lines[i]))
+        i = i + 1
+      }
+      let inner = parseDocument(qbuf.join("\n"))
+      blocks.push({ kind: "blockquote", children: inner })
+      continue
+    }
+
     // Heading
     if (startsWith(trimmed, "#")) {
       let h = 0
@@ -255,7 +367,7 @@ export fn parseDocument(src) {
       continue
     }
 
-    // List
+    // Unordered list
     if (startsWith(trimmed, "- ") || startsWith(trimmed, "* ")) {
       let items = []
       while (i < lines.length) {
@@ -265,6 +377,22 @@ export fn parseDocument(src) {
         else { break }
       }
       blocks.push({ kind: "list", ordered: false, items: items })
+      continue
+    }
+
+    // Ordered list (`1. `, `2. `, …). Numbers are not preserved — `<ol>`
+    // renumbers from 1, matching CommonMark.
+    let firstOrdered = parseOrderedItem(line)
+    if (firstOrdered !== null) {
+      let items = [firstOrdered]
+      i = i + 1
+      while (i < lines.length) {
+        let nextItem = parseOrderedItem(lines[i])
+        if (nextItem === null) { break }
+        items.push(nextItem)
+        i = i + 1
+      }
+      blocks.push({ kind: "list", ordered: true, items: items })
       continue
     }
 
@@ -293,7 +421,10 @@ export fn parseDocument(src) {
       if (startsWith(lt, "#")) { break }
       if (startsWith(lt, "```")) { break }
       if (startsWith(lt, "- ") || startsWith(lt, "* ")) { break }
+      if (parseOrderedItem(l4) !== null) { break }
       if (startsWith(lt, ":::") || startsWith(lt, "::")) { break }
+      if (isBlockquoteLine(l4)) { break }
+      if (isHorizontalRule(l4)) { break }
       if (startsWith(lt, "|") && i + 1 < lines.length && isTableSeparator(ltrim(lines[i + 1]))) { break }
       buf.push(l4)
       i = i + 1
@@ -331,12 +462,99 @@ fn renderCodeBody(text, lang) {
   return escapeMd(text)
 }
 
-// Inline rendering: `code`, **bold**, [link](url).
-fn renderInline(text) {
+// True if `c` is a Markdown punctuation character that backslash-escapes
+// should accept (i.e. `\X` collapses to a literal X). Anything else after a
+// backslash is left as-is so prose like `C:\path` survives.
+fn isEscapablePunct(c) {
+  return c === "*" || c === "_" || c === "`" || c === "~"
+    || c === "[" || c === "]" || c === "(" || c === ")"
+    || c === "<" || c === ">" || c === "#" || c === "+"
+    || c === "-" || c === "." || c === "!" || c === "\\"
+    || c === "|" || c === "{" || c === "}" || c === "/"
+    || c === "\"" || c === "'"
+}
+
+// Find the index of a closing `_` for an italic span opened at `start`. The
+// closing must be right-flanking: preceded by a non-space char, and followed
+// by a non-word char (or end of string). That's what stops `foo_bar_baz`
+// from accidentally lighting up as italic.
+fn findClosingUnderscore(text, start) {
+  let i = start + 1
+  while (i < text.length) {
+    if (text.charAt(i) === "_") {
+      let leftCh = i > 0 ? text.charAt(i - 1) : " "
+      let rightCh = i + 1 < text.length ? text.charAt(i + 1) : " "
+      if (leftCh !== " " && leftCh !== "\t" && !isAlphaNum(rightCh)) {
+        return i
+      }
+    }
+    i = i + 1
+  }
+  return -1
+}
+
+// Same idea for `__bold__`. Returns index of the first `_` in the closing
+// pair, or -1.
+fn findClosingDoubleUnderscore(text, start) {
+  let i = start + 2
+  while (i + 1 < text.length) {
+    if (text.charAt(i) === "_" && text.charAt(i + 1) === "_") {
+      let leftCh = i > 0 ? text.charAt(i - 1) : " "
+      let rightCh = i + 2 < text.length ? text.charAt(i + 2) : " "
+      if (leftCh !== " " && leftCh !== "\t" && !isAlphaNum(rightCh)) {
+        return i
+      }
+    }
+    i = i + 1
+  }
+  return -1
+}
+
+// True if the `<...>` content between two angle brackets is a URL we should
+// auto-link. We're conservative: only http(s) and mailto schemes, no spaces
+// inside. That keeps inline `<details>` etc. from accidentally rendering as
+// links.
+fn isAutolinkUrl(s) {
+  if (s === null || s.length === 0) { return false }
+  let lower = s.toLowerCase()
+  let hasScheme = (lower.length >= 7 && lower.substring(0, 7) === "http://")
+    || (lower.length >= 8 && lower.substring(0, 8) === "https://")
+    || (lower.length >= 7 && lower.substring(0, 7) === "mailto:")
+  if (!hasScheme) { return false }
+  let i = 0
+  while (i < s.length) {
+    let c = s.charAt(i)
+    if (c === " " || c === "\t" || c === "\n" || c === "<" || c === ">") { return false }
+    i = i + 1
+  }
+  return true
+}
+
+// Inline rendering. Walks `text` left-to-right and consumes the longest
+// matching construct at each position, falling back to character-escape for
+// anything that doesn't match. Order of checks matters — see the comments
+// inside the loop.
+//
+// Exported so directives that show short prose (Quiz prompts, Callout
+// titles, Project summaries, …) can render markdown in those strings without
+// pulling in the full block parser.
+export fn renderInline(text) {
   let out = ""
   let i = 0
   while (i < text.length) {
     let c = text.charAt(i)
+
+    // 1. Backslash escape — `\X` for any markdown punctuation X.
+    //    Runs first so an escaped backtick / bracket / etc. doesn't open a
+    //    code span / link below.
+    if (c === "\\" && i + 1 < text.length && isEscapablePunct(text.charAt(i + 1))) {
+      out = out + escapeMd(text.charAt(i + 1))
+      i = i + 2
+      continue
+    }
+
+    // 2. Inline code span — `` `foo` ``. Content is escaped verbatim, no
+    //    further inline parsing inside.
     if (c === "`") {
       let end = text.indexOf("`", i + 1)
       if (end < 0) { out = out + escapeMd(c); i = i + 1; continue }
@@ -344,6 +562,8 @@ fn renderInline(text) {
       i = end + 1
       continue
     }
+
+    // 3. Strong (`**…**`). Checked before italic so `**` doesn't open italic.
     if (c === "*" && i + 1 < text.length && text.charAt(i + 1) === "*") {
       let end = text.indexOf("**", i + 2)
       if (end < 0) { out = out + escapeMd(c); i = i + 1; continue }
@@ -351,6 +571,79 @@ fn renderInline(text) {
       i = end + 2
       continue
     }
+
+    // 4. Italic (`*…*`). Requires the opening `*` to be left-flanking (next
+    //    char isn't whitespace) so prose like `5 * 4 = 20` doesn't fire.
+    if (c === "*") {
+      if (i + 1 >= text.length || text.charAt(i + 1) === " " || text.charAt(i + 1) === "\t") {
+        out = out + escapeMd(c); i = i + 1; continue
+      }
+      let end = text.indexOf("*", i + 1)
+      if (end < 0) { out = out + escapeMd(c); i = i + 1; continue }
+      out = out + "<em>" + renderInline(text.substring(i + 1, end)) + "</em>"
+      i = end + 1
+      continue
+    }
+
+    // 5. Strong with underscores (`__…__`). Word-internal `__` (e.g.
+    //    `dunder__foo__bar`) stays literal because we require non-word
+    //    flanking on both sides.
+    if (c === "_" && i + 1 < text.length && text.charAt(i + 1) === "_") {
+      let leftCh = i > 0 ? text.charAt(i - 1) : " "
+      let nextCh = i + 2 < text.length ? text.charAt(i + 2) : " "
+      if (!isAlphaNum(leftCh) && nextCh !== " " && nextCh !== "\t") {
+        let end = findClosingDoubleUnderscore(text, i)
+        if (end > i) {
+          out = out + "<strong>" + renderInline(text.substring(i + 2, end)) + "</strong>"
+          i = end + 2
+          continue
+        }
+      }
+    }
+
+    // 6. Italic with underscores (`_foo_`). Same word-boundary rule as `__`.
+    if (c === "_") {
+      let leftCh = i > 0 ? text.charAt(i - 1) : " "
+      let nextCh = i + 1 < text.length ? text.charAt(i + 1) : " "
+      if (!isAlphaNum(leftCh) && nextCh !== " " && nextCh !== "\t") {
+        let end = findClosingUnderscore(text, i)
+        if (end > i) {
+          out = out + "<em>" + renderInline(text.substring(i + 1, end)) + "</em>"
+          i = end + 1
+          continue
+        }
+      }
+    }
+
+    // 7. Strikethrough (`~~foo~~`, GFM).
+    if (c === "~" && i + 1 < text.length && text.charAt(i + 1) === "~") {
+      let end = text.indexOf("~~", i + 2)
+      if (end >= 0) {
+        out = out + "<del>" + renderInline(text.substring(i + 2, end)) + "</del>"
+        i = end + 2
+        continue
+      }
+    }
+
+    // 8. Image — `![alt](url)`. Checked before link so the leading `!` is
+    //    consumed.
+    if (c === "!" && i + 1 < text.length && text.charAt(i + 1) === "[") {
+      let endTxt = text.indexOf("]", i + 2)
+      if (endTxt > 0 && endTxt + 1 < text.length && text.charAt(endTxt + 1) === "(") {
+        let endUrl = text.indexOf(")", endTxt + 2)
+        if (endUrl > 0) {
+          let alt = text.substring(i + 2, endTxt)
+          let url = text.substring(endTxt + 2, endUrl)
+          out = out + "<img src=\"" + escapeMd(url) + "\" alt=\"" + escapeMd(alt) + "\" />"
+          i = endUrl + 1
+          continue
+        }
+      }
+    }
+
+    // 9. Link — `[label](url)`. External URLs (http/https) get an arrow
+    //    affordance via the `ll-link-ext` class; everything else stays
+    //    in-app.
     if (c === "[") {
       let endTxt = text.indexOf("]", i + 1)
       if (endTxt > 0 && endTxt + 1 < text.length && text.charAt(endTxt + 1) === "(") {
@@ -369,6 +662,45 @@ fn renderInline(text) {
         }
       }
     }
+
+    // 10. Autolink — `<https://example.com>` / `<mailto:x@y>`.
+    if (c === "<") {
+      let end = text.indexOf(">", i + 1)
+      if (end > i) {
+        let url = text.substring(i + 1, end)
+        if (isAutolinkUrl(url)) {
+          let safe = escapeMd(url)
+          let display = safe
+          // mailto: links shouldn't open in a new tab and don't need the
+          // external-link arrow; everything else does.
+          let lower = url.toLowerCase()
+          let isMail = lower.length >= 7 && lower.substring(0, 7) === "mailto:"
+          if (isMail) {
+            display = escapeMd(url.substring(7))
+            out = out + "<a href=\"" + safe + "\">" + display + "</a>"
+          } else {
+            out = out + "<a href=\"" + safe + "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"ll-link-ext\">" + display + "</a>"
+          }
+          i = end + 1
+          continue
+        }
+      }
+    }
+
+    // 11. Hard line break — two-or-more trailing spaces immediately before a
+    //     newline collapse into `<br>`. A bare `\n` stays as a soft break
+    //     (whitespace), matching CommonMark.
+    if (c === "\n") {
+      let outLen = out.length
+      if (outLen >= 2 && out.charAt(outLen - 1) === " " && out.charAt(outLen - 2) === " ") {
+        let trimEnd = outLen
+        while (trimEnd > 0 && out.charAt(trimEnd - 1) === " ") { trimEnd = trimEnd - 1 }
+        out = out.substring(0, trimEnd) + "<br>"
+        i = i + 1
+        continue
+      }
+    }
+
     out = out + escapeMd(c)
     i = i + 1
   }
@@ -398,6 +730,19 @@ export fn blockToHtml(block) {
     let lang = block.lang === null ? "" : block.lang
     let body = renderCodeBody(block.text, lang)
     return "<pre class=\"code-block\"><code class=\"lang-" + escapeMd(lang) + "\">" + body + "</code></pre>"
+  }
+  if (block.kind === "blockquote") {
+    let inner = ""
+    let i = 0
+    while (i < block.children.length) {
+      let child = block.children[i]
+      if (child.kind !== "frontmatter") { inner = inner + blockToHtml(child) }
+      i = i + 1
+    }
+    return "<blockquote class=\"md-quote\">" + inner + "</blockquote>"
+  }
+  if (block.kind === "hr") {
+    return "<hr class=\"md-hr\" />"
   }
   if (block.kind === "table") {
     let header = block.header

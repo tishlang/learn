@@ -3,13 +3,15 @@ title: Why Tish?
 summary: Design intent and what's different from JavaScript.
 ---
 
-Tish is a small, JS-shaped language that runs three ways from one source:
+Tish is a small, JS-shaped language. **Write your program once, then choose how to run it** — no rewrite, no second toolchain, no extra runtime to install.
 
-1. **Tree-walking interpreter** (`tish run`) — instant feedback, no build step.
-2. **Bytecode VM** — embedded in WASM (and used by this site's Run buttons).
-3. **Compiled** to Rust + `tishlang_runtime`, native binaries, JS, or WASM/WASI.
+There are three ways the same `.tish` file can execute:
 
-**Same source, three runtimes.** That's the design north star.
+1. **Run it directly** with `tish run`. The interpreter walks your code as-is, so there's no build step. Best for scripts, the REPL, and the dev loop.
+2. **Run it on a tiny embedded VM.** The source is compiled to compact bytecode and executed by `tishlang_vm` — small enough to fit inside a WebAssembly module. That's how the Run buttons on this site work.
+3. **Compile it to a final artifact** — a native binary, a JavaScript bundle, or a WASM/WASI module — and ship that on its own.
+
+These are *alternatives*, not layers stacked on top of each other: you pick one per program. The source file doesn't change. [Chapter 26](/tish-deep/26-build-targets) goes through every artifact in detail.
 
 ## Why a new language?
 
@@ -34,7 +36,7 @@ fn App() {
   const greeting = `Hello, ${"world"}!`
   return <div class="card">
     <h1>{greeting}</h1>
-    <p>{"Same source. Three runtimes."}</p>
+    <p>{"One source file. Three ways to run it."}</p>
   </div>
 }
 
@@ -46,7 +48,7 @@ You can write `let x: number = 1` and `fn f(a: T): R`. The annotations are **par
 :::
 
 :::quiz{id=01-why-q1}
-- prompt: How many runtimes share a single Tish source file?
+- prompt: How many different ways can the same Tish source file be executed?
 - options: [1, 3, "depends on the build flag"]
 - answer: 3
 :::

@@ -16,7 +16,13 @@ export fn parsePath(pathname) {
   if (p === null || p === undefined) { p = "/" }
   if (p.length > 0 && p.charAt(0) === "/") { p = p.substring(1) }
   if (p.length === 0) { return { view: "home", track: null, chapter: null } }
+  // /sandbox — full-screen popup mount of SandboxIde from tish-ide-panels.
+  // Reserved word; "sandbox" is not a curriculum track id.
   let firstSlash = p.indexOf("/")
+  let firstSeg = firstSlash < 0 ? p : p.substring(0, firstSlash)
+  if (firstSeg === "sandbox") {
+    return { view: "sandbox", track: null, chapter: null }
+  }
   if (firstSlash < 0) {
     return { view: "track", track: p, chapter: null }
   }

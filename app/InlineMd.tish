@@ -1,0 +1,25 @@
+// Renders a short string as inline Markdown — `code`, **bold**, *italic*,
+// [links](url), etc. — and writes the resulting HTML into a `<span>` via
+// imperative innerHTML. Works inside any element, including the body of a
+// button, so we can use it for Quiz options without breaking click handlers.
+//
+// The `tag` prop lets the caller pick a different element (e.g. "p" for the
+// Project summary) so semantic markup is preserved.
+
+import { useRef, useLayoutEffect } from "lattish"
+import { renderInline } from "./tishdoc.tish"
+
+export fn InlineMd(props) {
+  let text = props.text === null || props.text === undefined ? "" : String(props.text)
+  let cls = "cls" in props ? props.cls : ""
+  let tag = "tag" in props && props.tag !== null ? props.tag : "span"
+  let elRef = useRef(null)
+  useLayoutEffect(() => {
+    if (elRef.current !== null) { elRef.current.innerHTML = renderInline(text) }
+  }, null)
+  if (tag === "p") { return <p class={cls} ref={elRef} /> }
+  if (tag === "div") { return <div class={cls} ref={elRef} /> }
+  if (tag === "h1") { return <h1 class={cls} ref={elRef} /> }
+  if (tag === "h2") { return <h2 class={cls} ref={elRef} /> }
+  return <span class={cls} ref={elRef} />
+}

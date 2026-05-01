@@ -8,6 +8,7 @@
 import { useState } from "lattish"
 import { setItem, getItem } from "../progress.tish"
 import { opt } from "../utils/objects.tish"
+import { InlineMd } from "../InlineMd.tish"
 
 fn parseList(line) {
   let s = line
@@ -96,7 +97,9 @@ export fn Quiz(props) {
     else if (isChosen && !isCorrect) { cls = "quiz-opt quiz-opt-wrong" }
     else if (choice !== null && isCorrect) { cls = "quiz-opt quiz-opt-correct-hint" }
     let captured = optTxt
-    buttons.push(<button class={cls} onclick={() => pick(captured)}>{captured}</button>)
+    buttons.push(<button class={cls} onclick={() => pick(captured)}>
+      <InlineMd text={captured} />
+    </button>)
     i = i + 1
   }
 
@@ -109,7 +112,7 @@ export fn Quiz(props) {
   }
 
   return <div class="dir-quiz">
-    <div class="quiz-prompt">{parsed.prompt}</div>
+    <InlineMd tag="div" cls="quiz-prompt" text={parsed.prompt} />
     <div class="quiz-opts">{buttons}</div>
     {feedback}
   </div>
