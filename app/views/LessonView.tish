@@ -412,20 +412,37 @@ export fn LessonView(props) {
     i = i + 1
   }
   let blocks = []
+  let deferredSandboxes = []
   let j = 0
   while (j < parsed.length) {
     let b = parsed[j]
     if (b.kind !== "frontmatter") {
-      blocks.push(renderBlock(b, track, chapter))
+      let deferSandbox = track === "capstones"
+        && (b.kind === "directive_block" || b.kind === "directive_leaf")
+        && b.name === "sandbox"
+      if (deferSandbox) {
+        deferredSandboxes.push(renderBlock(b, track, chapter))
+      } else {
+        blocks.push(renderBlock(b, track, chapter))
+      }
     }
     j = j + 1
   }
 
   let nav = findPrevNext(manifest, chapter)
 
+  let sandboxEnd = null
+  if (deferredSandboxes.length > 0) {
+    sandboxEnd = <section class="ll-lesson-sandbox-end" aria-labelledby="ll-lesson-sandbox-end-title">
+      <h2 id="ll-lesson-sandbox-end-title" class="ll-lesson-sandbox-end-title">{"Playground"}</h2>
+      <div class="ll-lesson-sandbox-end-body">{deferredSandboxes}</div>
+    </section>
+  }
+
   return <article class="ll-lesson">
     <LessonHeader track={track} chapter={chapter} frontmatter={frontmatter} />
     <div class="ll-lesson-body">{blocks}</div>
+    {sandboxEnd}
     <PrevNext track={track} prev={nav.prev} next={nav.next} />
   </article>
 }

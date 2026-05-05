@@ -3,7 +3,13 @@ title: "C5 — Whiteboard: Broadcast strokes"
 summary: BroadcastChannel sync between same-origin tabs.
 ---
 
-We'll send each stroke (or each point as we draw it) over `createBcWebSocket("bc://wb/...")`. Two tabs of this lesson will mirror each other instantly.
+Networks lie about latency; **`mousemove` handlers lie about cardinality**. Blast every pointer sample down a channel without thinking and you've reinvented unintentional DDOS inside the browser profile. Collaboration code is perf code: batch, compress intent, reconcile ordering.
+
+You've already nailed stroke geometry. Here we graft transport: identifiers for strokes, chunked point uploads, optimistic local drawing, deterministic replay on the remote side—the same playbook Figma abstracts, only visible because we typed it ourselves.
+
+## What this chapter adds
+
+We send each stroke (or batched points) over **`createBcWebSocket("bc://wb/...")`**: same WebSocket-shaped API as the chat capstone, so two tabs of this lesson mirror each other instantly. Remote strokes need a stable **`id`** so `stroke-points` messages append to the correct polyline.
 
 ## Throttling
 
@@ -29,7 +35,7 @@ fn queuePoint(ws, pt) {
 }
 ```
 
-## Wire it up
+The **Playground** at the bottom of this page contains the full pad + channel wiring.
 
 :::sandbox{kind=ide id=cap-wb-02}
 import { createRoot, useRef, useState, useEffect } from "lattish"
@@ -159,7 +165,8 @@ fn PadApp() {
 createRoot(document.body).render(PadApp)
 :::
 
-Open this in two tabs. Draw in either. Both update.
+Open the **Playground** in two tabs. Draw in either; both should update.
+
 
 :::quiz{id=cap-wb-02-q1}
 - prompt: Why include a stroke `id` in each message?

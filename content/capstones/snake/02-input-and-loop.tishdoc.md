@@ -3,6 +3,14 @@ title: "C2 — Snake: Input and loop"
 summary: Keyboard, requestAnimationFrame, food, collision.
 ---
 
+Interactivity is scheduling. The player changes their mind faster than the snake should turn, so games buffer **intent** and commit it on a tick. Arcade Snake traditionally runs at a low, legible framerate so you can read every cell; smoother games swap `setInterval` for `requestAnimationFrame`, but the bookkeeping is identical: read input, integrate state, repaint.
+
+This chapter introduces the loop that glues your static frame from last time into something you can actually play. Notice how `step` and `draw` stay friends: if you can describe a frame in words ("head moved east, tail shrank unless we ate"), the code stays reviewable when you add scoring and audio next.
+
+## What this chapter adds
+
+Input + tick loop on top of the grid from last time: arrow keys change **intent** (`pendingDir`), each tick commits direction, moves the head, handles eat / grow / wall and self collision, then redraws.
+
 The game loop:
 
 1. Read input → update direction.
@@ -11,6 +19,10 @@ The game loop:
 4. Wait one tick. Repeat.
 
 For pixel-art games, **`setInterval`** at ~120ms gives a chunky, snake-like feel. For smoother motion (60fps), use `requestAnimationFrame` — but Snake feels right at 8–10 fps.
+
+`step()` mutates `snake`, `food`, and `alive`; `draw()` only reads them and paints rects. Keeping that split makes the next “juice” chapter easier.
+
+The **Playground** at the bottom of the page is the full playable: score, game over, reset.
 
 ## Full playable
 
@@ -112,11 +124,12 @@ fn SnakeApp() {
 createRoot(document.body).render(SnakeApp)
 :::
 
-Click on the canvas first to capture keyboard focus, then play with arrow keys.
+In the Playground, click the canvas first to capture keyboard focus, then play with arrow keys.
 
 :::callout{kind=tip title="Why `pendingDir`?"}
 If we updated `dir` directly from keys, you could press right→down within the same tick and turn into yourself. Buffering input as `pendingDir` and committing it once per tick prevents that.
 :::
+
 
 :::quiz{id=cap-snake-02-q1}
 - prompt: Why two direction variables (dir and pendingDir)?

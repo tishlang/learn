@@ -3,7 +3,9 @@ title: "C1 — Chat: Take it real"
 summary: One-line diff to make it a deployable Tish server.
 ---
 
-The browser-side chat works between tabs. To put it in front of strangers — different machines, different networks — swap the import and stand up a real Tish HTTP+WS server.
+Local-first demos cheat in the best way: they let you learn physics without learning operations. Tabs on your laptop obey different rules than phones on LTE, though, and at some point you want the latter. The comforting truth is that **most of what you authored is honest application code.** The shim was only standing in for a socket constructor and a routing layer you will own on a host.
+
+This chapter reads like release notes crossed with architecture notes. You will see the smallest diff that swaps the BroadcastChannel shim for a real WebSocket endpoint, sketch what a relay server shape looks like in Tish, and name the forks in the road—managed WebSockets, DIY HTTP, or WebRTC if you truly want to avoid a relay. None of that invalidates the UI you already built; it relocates the wire.
 
 ## The diff
 
@@ -66,6 +68,7 @@ You built:
 - A drop-in deploy story to make it a real service.
 
 The Capstones C5 (whiteboard) and the beginner Part-VII chat lesson share this engine — same `createBcWebSocket` API, identical "take it real" diff.
+
 
 :::quiz{id=cap-chat-03-q1}
 - prompt: To go from same-origin chat to cross-device chat, the simplest no-server path is...

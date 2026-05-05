@@ -11,6 +11,14 @@ You'll build:
 - Sound (`AudioContext`), particle effects, high score in `localStorage`.
 :::
 
+Every game engine marketing page promises particles and PBR; almost every **finished** game shipped because someone separated "what is true" from "what is drawn." Snake is the perfect exercise: the world is a tiny grid, the renderer is rectangles, and cheating is obvious if the two drift apart.
+
+If you have only ever followed “draw in the game loop” tutorials, this chapter gives you the counterpoint. We keep mutation in plain data (`snake`, `food`, constants for the board) and let the canvas function as a dumb television. Once that habit clicks, keyboard input, collision, and polish are incremental instead of surgical.
+
+## What this chapter builds
+
+A **read-only** snake: three segments and a food square on a grid-backed canvas. No keyboard loop yet — that is the next chapter — but you already separate **state** (arrays and numbers) from **drawing** (`getContext("2d")`, fill rects).
+
 ## The model
 
 Snake is a list of `{x, y}` cells. Food is a single cell. Direction is a unit vector.
@@ -26,7 +34,7 @@ let food = { x: 5, y: 5 }
 
 ## Render
 
-Each frame: clear the canvas, draw food, draw every snake cell.
+Each frame: clear the canvas, draw food, draw every snake cell. The Playground at the end of the page runs the full `useEffect` that calls `draw()` once on mount so you see the static frame.
 
 :::sandbox{kind=ide id=cap-snake-01}
 import { createRoot, useEffect, useRef } from "lattish"
@@ -67,11 +75,12 @@ fn SnakeApp() {
 createRoot(document.body).render(SnakeApp)
 :::
 
-You should see a static three-segment snake and a food pellet. Next chapter: make it move.
+In the Playground you should see a static three-segment snake and a food pellet. Next chapter: make it move.
 
 :::callout{kind=tip title="`SIZE - 2` instead of `SIZE`"}
 Drawing each cell two pixels smaller leaves a gap between cells, making the snake legible. A subtle but important visual choice.
 :::
+
 
 :::quiz{id=cap-snake-01-q1}
 - prompt: How is the snake's shape stored?

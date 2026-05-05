@@ -3,7 +3,9 @@ title: "C5 — Whiteboard: Presence + WebRTC"
 summary: User cursors, undo, paste-the-offer cross-device sync.
 ---
 
-Two finishing touches.
+You've shipped same-machine sync. The next itch is philosophical: why can my coworker—not my clone tab—join? `BroadcastChannel` stops at origin + device boundaries, so crossing the internet means either renting infrastructure or embracing WebRTC's slightly feral handshake.
+
+This chapter mixes product detail with systems detail: ephemeral presence overlays, humane undo semantics, and the gloriously awkward **paste-an-SDP-between-Slack-windows** workaround that nevertheless works when you only trust two brains. Treat it like the Medium post titled "Shipped multiplayer without kubernetes (don't tell my boss)."
 
 ## Presence — see other cursors
 
@@ -70,6 +72,7 @@ This is fiddly but **completely serverless** for two-person sessions. Three+ peo
 ## Take it real (server)
 
 The `bc://wb/main` channel is local. To put the whiteboard on the open internet, run a Tish HTTP+WS broadcast relay. The chat capstone (C1) walked through this — the same shape applies here.
+
 
 :::quiz{id=cap-wb-03-q1}
 - prompt: How does WebRTC paste-the-offer skip the need for a signaling server?

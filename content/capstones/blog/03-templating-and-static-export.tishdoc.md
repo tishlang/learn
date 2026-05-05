@@ -3,7 +3,9 @@ title: "C3 — Blog: Templates and static pages"
 summary: Wrap each post in a layout; build an index page.
 ---
 
-A real static site has a layout: nav, header, footer; per-post pages; an index linking to them.
+Publishing used to mean FTPing `index.html`. Modern static workflows still end in HTML files—**you** just stopped writing them by hand. Wrapping each rendered post in a layout is the moment your generator graduates from "script" to "publisher": shared navigation, typography, feed links, and boring legal footers happen once, then every article inherits them.
+
+We stay string-native on purpose. No JSX runtime in the output directory, no hydration mystery. You build an array of `{ path, content }`, each `content` already a full HTML document—complete with `<header>`, `<footer>`, and consistent CSS—then next chapter zips that tree so you can drag it onto any host that speaks HTTP.
 
 ## The template function
 
@@ -54,6 +56,7 @@ The result: a list of `{path, content}` pairs. The next chapter packages them in
 :::callout{kind=tip title="Generated, not magic"}
 Each page is a string. There's no rendering framework or hydration. Open any output file in a plain browser and it works — that's the appeal of static.
 :::
+
 
 :::quiz{id=cap-blog-03-q1}
 - prompt: Why pre-render to static HTML rather than render in-browser at view time?

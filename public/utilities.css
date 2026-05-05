@@ -663,3 +663,395 @@
   border-radius: 4px;
 }
 
+/* ---------------------------------------------------------------------------
+   SandboxIde — embed mode and console mode tweaks.
+   --------------------------------------------------------------------------- */
+
+/* Embed mode: SandboxIde dropped into someone else's page (lessons, Tauri
+   side-panel). Keep it bounded by the parent box rather than 100vh, drop the
+   page-style header height, and trim the title/preset chrome. */
+.pg-root.pg-embed {
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pg-header-embed {
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  justify-content: flex-end;
+}
+
+.pg-header-embed .pg-header-actions {
+  gap: 0.4rem;
+}
+
+.pg-header-embed .pg-run {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* Console-only kind has no preview and stacks vertically. */
+.pg-root.pg-kind-console .pg-body {
+  flex-direction: column;
+  --terminal-height: 35;
+}
+
+.pg-root.pg-kind-console .pg-body > .pg-panel-terminal {
+  height: calc(var(--terminal-height) * 1%);
+  min-height: 4rem;
+  flex: 0 0 auto;
+}
+
+.pg-root.pg-kind-console .pg-body > .pg-panel-editor {
+  flex: 1;
+}
+
+/* Open-in-new-window / Share / Embed / Fork buttons.
+   All share the same neutral skin as the Lattish DOM toggle. */
+.pg-newwin,
+.pg-share,
+.pg-embed-btn,
+.pg-fork {
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.pg-newwin:hover,
+.pg-share:hover,
+.pg-embed-btn:hover,
+.pg-fork:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+  border-color: var(--muted-foreground);
+}
+
+/* Share / Embed / Fork live in a single visual cluster. */
+.pg-share-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* "shared" badge in the title row when viewing a #share= URL. */
+.pg-share-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--lattish-accent);
+  border-radius: 999px;
+  color: var(--lattish-accent);
+  background: oklch(0.85 0.18 95 / 0.1);
+}
+
+/* Toast that pops up for "Share link copied" etc. */
+.pg-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 999999;
+  padding: 0.55rem 1rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--foreground, #e6e9ed);
+  background: var(--card, #161a20);
+  border: 1px solid var(--border, #2a2e36);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: pg-toast-fade 2.2s ease forwards;
+}
+
+@keyframes pg-toast-fade {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  8%   { opacity: 1; transform: translate(-50%, 0); }
+  88%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+
+/* ---------------------------------------------------------------------------
+   Share / Embed modal — opens when Share or Embed is clicked. Lives on
+   document.body so nested `pg-root` containers and ancestor `transform`
+   contexts can't constrain its `position: fixed`.
+   --------------------------------------------------------------------------- */
+
+.pg-modal-host {
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  font-family: inherit;
+  animation: pg-modal-in 0.16s ease-out;
+}
+
+@keyframes pg-modal-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.pg-modal {
+  background: var(--card, #161a20);
+  color: var(--foreground, #e6e9ed);
+  border: 1px solid var(--border, #2a2e36);
+  border-radius: 10px;
+  padding: 0;
+  width: min(640px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.6);
+  animation: pg-modal-pop 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes pg-modal-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pg-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem 0.6rem;
+  border-bottom: 1px solid var(--border, #2a2e36);
+}
+
+.pg-modal-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pg-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground, #6b7280);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.pg-modal-close:hover {
+  background: var(--secondary, #1a1d22);
+  color: var(--foreground, #e6e9ed);
+}
+
+.pg-modal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.85rem 0;
+  border-bottom: 1px solid var(--border, #2a2e36);
+}
+
+.pg-modal-tab {
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground, #9ca3af);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.pg-modal-tab:hover {
+  color: var(--foreground, #e6e9ed);
+}
+
+.pg-modal-tab-active {
+  color: var(--foreground, #e6e9ed);
+  border-bottom-color: var(--primary, #a78bfa);
+}
+
+.pg-modal-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow: auto;
+}
+
+.pg-modal-desc {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted-foreground, #9ca3af);
+}
+
+.pg-modal-value {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: var(--background, #0f1114);
+  color: var(--foreground, #e6e9ed);
+  border: 1px solid var(--border, #2a2e36);
+  border-radius: 6px;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.pg-modal-value:focus {
+  outline: none;
+  border-color: var(--primary, #a78bfa);
+}
+
+.pg-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pg-modal-primary {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary, #a78bfa);
+  color: oklch(0.11 0 0);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.pg-modal-primary:hover {
+  filter: brightness(1.08);
+}
+
+.pg-modal-secondary {
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border, #2a2e36);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground, #e6e9ed);
+  cursor: pointer;
+}
+
+.pg-modal-secondary:hover {
+  background: var(--secondary, #1a1d22);
+  border-color: var(--muted-foreground, #6b7280);
+}
+
+.pg-modal-footnote {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--muted-foreground, #6b7280);
+}
+
+/* ---------------------------------------------------------------------------
+   Codepen-style playground chrome (tish-playground/app/shell.tish).
+   --------------------------------------------------------------------------- */
+
+.pg-playground-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+}
+
+.pg-playground-mount {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pg-playground-mount > .pg-root {
+  flex: 1;
+  min-height: 0;
+}
+
+.pg-toolbar-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Examples dropdown. */
+.pg-examples {
+  position: relative;
+}
+
+.pg-examples-trigger {
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.pg-examples-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 0.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.pg-examples-item {
+  font-family: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.pg-examples-item:hover {
+  background: var(--secondary);
+}
+
+/* Embed-host: when the playground is loaded with `?embed=1`, the body
+   becomes a tightly-bounded box so it nests cleanly inside an <iframe>. */
+.pg-embed-host {
+  height: 100%;
+  min-height: 0;
+}
+
+.pg-embed-host .pg-playground-root {
+  height: 100%;
+}
+

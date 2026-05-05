@@ -3,7 +3,9 @@ title: "C4 — REST API: Persistence"
 summary: Survive a reload via the IndexedDB-backed fs.
 ---
 
-The API works, but reloading the page wipes all notes. Time to persist.
+Volatile RAM demos are pedagogically tidy and operationally heartbreaking: refresh the lesson tab and your thoughtfully crafted REST responses evaporate. Users expect otherwise—note apps survive closing the lid, drafts survive crashes—so persistence is never an "extra chapter," it is the moment your toy becomes software.
+
+We'll lean on **`tish-browser-server`'s virtual `fs`**, which persists to IndexedDB. The pattern mirrors what you would ship on-disk: hydrate state at boot, eagerly save after mutations, tolerate parse errors like adult engineers. Afterwards we talk concurrency honestly—tabs, locks, eventual consistency—because those lectures start now whether or not Postgres is invited yet.
 
 ## Save on every mutation
 
@@ -54,6 +56,7 @@ The Capstones-track REST API is intentionally a starting point — production-sh
 :::callout{kind=tip title="Browser caveat"}
 IndexedDB is async and per-origin. If a user opens this lesson in two tabs, both tabs see the same data. That's fine here, but in a real app you'd add a locking pattern or use a single-writer service worker.
 :::
+
 
 :::quiz{id=cap-rest-02-q1}
 - prompt: Where do tish-browser-server's API state files actually live?

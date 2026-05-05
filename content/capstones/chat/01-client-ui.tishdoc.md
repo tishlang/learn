@@ -11,9 +11,34 @@ You'll build:
 - A "take it real" appendix to upgrade to a deployable Tish HTTP server.
 :::
 
-## The shell
+Most tutorials jump straight into `WebSocket` and lose people before they have anything on screen. That is backwards. A chat app is **UX first**: scrolling history, drafting text, swapping rooms—all of that is boring web UI, but it is the part users touch. Nail it early and the transport layer feels like plugging in a cable instead of rewriting the house.
 
-We'll build the UI in this chapter; wire up real-time in the next; deploy in the final.
+Here we pretend the backend does not exist yet. You will render a plausible room picker, transcript, and compose box entirely with Lattish state. When you eventually wire real-time messaging, none of those components need to become cleverer—they only subscribe to events the same way you already append to local arrays today.
+
+## What this chapter builds
+
+By the end you have a **single-tab chat shell**: room name in the hash (`#chat/general`), a message list, and a compose box. Nothing leaves the browser yet — messages you send only appear in **this** tab. The next chapter swaps the data path for a WebSocket-shaped channel so every open tab sees the same room.
+
+## Why three pieces of state?
+
+- **`room`** — driven from `location.hash` so bookmarks and refreshes keep you in the same room (we only *read* the hash in this chapter; you can still type a room name in the input to experiment).
+- **`messages`** — append-only log of `{ from, text, at }` for the transcript.
+- **`draft`** — the string in the compose field; it clears on send so the input does not fight the log.
+
+## Hash helper
+
+The playground uses a tiny parser so the app knows which room label to show:
+
+```tish
+fn parseRoom() {
+  if (typeof location === "undefined") { return "general" }
+  const h = location.hash
+  if (h.indexOf("#chat/") === 0) { return h.substring(6) }
+  return "general"
+}
+```
+
+**Playground** — at the end of this page — is the full Lattish UI: header, log, send button, and starter code you can edit before we wire up sync.
 
 :::sandbox{kind=ide id=cap-chat-01}
 import { createRoot, useState } from "lattish"
@@ -70,13 +95,14 @@ fn ChatApp() {
 createRoot(document.body).render(ChatApp)
 :::
 
-Right now messages only show in the tab you typed in. Next chapter: make them appear in **every open tab** instantly.
+After you run the Playground, try sending a few lines: they only show in the tab you typed in. The next chapter makes them appear in **every open tab** instantly.
 
 :::callout{kind=tip title="Architecture preview"}
 The two pieces we'll add:
 1. **Subscribe**: open a `BroadcastChannel` on mount, push received messages into state.
 2. **Publish**: when sending, post to the channel **and** add to local state (optimistic UI).
 :::
+
 
 :::quiz{id=cap-chat-01-q1}
 - prompt: Why do we need separate `messages` state and `draft` state?

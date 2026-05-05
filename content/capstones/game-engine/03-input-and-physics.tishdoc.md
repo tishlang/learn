@@ -3,30 +3,36 @@ title: "C6 — Game engine: Input and AABB physics"
 summary: Keyboard, gamepad, axis-aligned bounding boxes.
 ---
 
-## Input
+Physics in games is ninety percent bookkeeping: integrate velocity, clamp to solids, propagate grounded flags so jump feels intentional. ECS shines here—you query `(playerControl, velocity, aabb)`, adjust numbers, leave rendering alone.
 
-A small input state object queried from systems:
+We'll keep collision **axis-aligned** (AABB: axis-aligned bounding box). No rotated rectangles—overlap tests are four comparisons. Good enough for platformers until you ship slopes as a deliberate sequel.
+
+## Input as polled state, not events inside systems
+
+`keydown` / `keyup` are events; gameplay wants a **snapshot** each frame: "is left held?". A tiny global (or object owned by the game shell) flips booleans. Systems read `input.left`—they do not subscribe to DOM events themselves. That keeps simulation deterministic and testable.
 
 ```tish
-const input = { left: false, right: false, up: false, down: false, jump: false }
+const input = { left: false, right: false, jump: false }
 
 fn setupInput() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") { input.left = true }
     if (e.key === "ArrowRight") { input.right = true }
-    if (e.key === "ArrowUp") { input.up = true }
-    if (e.key === "ArrowDown") { input.down = true }
     if (e.key === " ") { input.jump = true }
   })
   document.addEventListener("keyup", (e) => {
     if (e.key === "ArrowLeft") { input.left = false }
     if (e.key === "ArrowRight") { input.right = false }
-    if (e.key === "ArrowUp") { input.up = false }
-    if (e.key === "ArrowDown") { input.down = false }
     if (e.key === " ") { input.jump = false }
   })
 }
+```
 
+## `playerSystem`: intent → velocity
+
+We only touch entities tagged `playerControl`. Horizontal movement sets `velocity.x`; jump applies an impulse **only** when `grounded` is true—classic coyote-time and buffering are upgrades for later.
+
+```tish
 fn playerSystem(world, dt) {
   const ps = world.all("playerControl")
   let i = 0
@@ -45,11 +51,11 @@ fn playerSystem(world, dt) {
 }
 ```
 
-Gamepad: `navigator.getGamepads()` exposes connected controllers. Read it in the input system; treat axes ≥ 0.5 as held.
+`grounded` flips true again when collision resolution discovers the player standing on a solid—see below.
 
-## AABB collision
+## AABB overlap (one test, reused everywhere)
 
-Each "solid" entity has `position` + `aabb: { w, h }`. Two boxes overlap when both x ranges and y ranges overlap.
+Each solid stores `position` plus `aabb: { w, h }`. Two boxes overlap iff their **x intervals** overlap **and** their **y intervals** overlap—no square roots, no trig.
 
 ```tish
 fn aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
@@ -57,58 +63,31 @@ fn aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
 }
 ```
 
-## Resolve in two passes
+## Why resolve in two passes (X, then Y)
 
-Move on X, resolve X collisions; move on Y, resolve Y. Solves the corner-clipping artifact of one-pass resolution.
+If you move diagonally into a corner in one gulp, you can clip through the seam between two tiles. **Separate axes**: integrate and resolve X against solids, then Y. When landing on a floor, the Y pass sets `grounded = true` so the next jump is allowed.
+
+The full `collideAndMove` loop is long on the page because it is repetitive—same inner pattern for the X sweep and the Y sweep. Conceptually:
+
+1. For each moving body with `velocity`, `position`, `aabb`:
+2. **X pass:** `p.x += v.x * dt`; for each solid, if overlapping, nudge `p.x` out on the correct side and zero `v.x`.
+3. **Y pass:** same for `y` / `v.y`; if landing from above, set `grounded`.
 
 ```tish
-fn collideAndMove(world, dt) {
-  const movers = world.all("velocity")
-  let i = 0
-  while (i < movers.length) {
-    const id = parseInt(movers[i][0], 10)
-    if (!world.has(id, "position") || !world.has(id, "aabb")) { i = i + 1; continue }
-    const p = world.get(id, "position")
-    const v = movers[i][1]
-    const a = world.get(id, "aabb")
-
-    // X pass
-    p.x = p.x + v.x * dt
-    let solids = world.all("solid")
-    let j = 0
-    while (j < solids.length) {
-      const sid = parseInt(solids[j][0], 10)
-      const sp = world.get(sid, "position")
-      const sa = world.get(sid, "aabb")
-      if (aabbOverlap(p.x, p.y, a.w, a.h, sp.x, sp.y, sa.w, sa.h)) {
-        if (v.x > 0) { p.x = sp.x - a.w }
-        else if (v.x < 0) { p.x = sp.x + sa.w }
-        v.x = 0
-      }
-      j = j + 1
-    }
-    // Y pass
-    p.y = p.y + v.y * dt
-    j = 0
-    while (j < solids.length) {
-      const sid = parseInt(solids[j][0], 10)
-      const sp = world.get(sid, "position")
-      const sa = world.get(sid, "aabb")
-      if (aabbOverlap(p.x, p.y, a.w, a.h, sp.x, sp.y, sa.w, sa.h)) {
-        if (v.y > 0) {
-          p.y = sp.y - a.h
-          if (world.has(id, "playerControl")) { world.get(id, "playerControl").grounded = true }
-        } else if (v.y < 0) { p.y = sp.y + sa.h }
-        v.y = 0
-      }
-      j = j + 1
-    }
-    i = i + 1
-  }
-}
+// Shape of the inner loop (X pass) — repeated per solid:
+// if (aabbOverlap(...)) {
+//   if (v.x > 0) { p.x = sp.x - a.w }   // hit right face while moving right
+//   else if (v.x < 0) { p.x = sp.x + sa.w }
+//   v.x = 0
+// }
 ```
 
-That's a working platformer-style physics. Add gravity by giving the player a constant downward acceleration in the motion system.
+Gravity belongs in a small system **before** collision (increment `velocity.y` each tick for the player), or folded into the same pass depending how you split files—the Playground at the end of this track uses one clear ordering so nothing double-integrates.
+
+## Gamepads (one sentence, one API)
+
+`navigator.getGamepads()` returns connected controllers; read axes and buttons in the same place you read `input.left`, mapping stick deflection past a threshold to those booleans. Same snapshot model.
+
 
 :::quiz{id=cap-game-03-q1}
 - prompt: Why resolve collisions in two passes (X then Y)?

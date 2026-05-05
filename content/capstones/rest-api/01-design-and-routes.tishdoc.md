@@ -11,6 +11,10 @@ You'll build:
 - A "take it real" diff — same code on a deployable server.
 :::
 
+You have probably built a dozen `fetch` wrappers in frontend code. Fewer engineers have spelled out the symmetry: **verbs, paths, and JSON bodies mirror the server's routing table.** This capstone is that symmetry with the training wheels on—handlers run behind `tish-browser-server`'s Service Worker shim so CRUD behaves identically whether you iterate in-browser or migrate to `'http'` imports.
+
+Treat the next pages like a miniature systems design memo: routing first, persistence second, Lattish client third, deployment diff last. Same story every production API follows—just compressed into an afternoon-friendly arc.
+
 ## REST in 30 seconds
 
 | Verb | Path | Meaning |
@@ -88,6 +92,7 @@ Open the browser DevTools Network tab. The `fetch("/api/notes")` calls go to the
 - `404` Not Found.
 - `409` Conflict (e.g. duplicate id).
 :::
+
 
 :::quiz{id=cap-rest-01-q1}
 - prompt: What status code does a successful DELETE typically return?

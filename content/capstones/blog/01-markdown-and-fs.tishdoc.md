@@ -11,6 +11,23 @@ You'll build:
 - A zip writer that downloads the whole site as one file.
 :::
 
+Static site generators romanticize the destination—clean URLs, fast loads, zero moving parts in production—while hand-waving where the `.md` files actually live while you author. In this capstone we refuse that hand-wave: **posts are plain files** addressed with pathnames, read through the same async `fs` API you would reach for in a real Tish server. The browser just happens to back that `fs` with IndexedDB so nobody needs to `git clone` anything to try the tutorial.
+
+By the end of this first chapter you will have a credible "admin view": seed posts idempotently, list them with frontmatter-derived titles, and stare at the filenames that will eventually become slugs. Rendering and zipping come next; right now we rehearse the librarian's job.
+
+## Why a virtual disk?
+
+The static-site generator never touches your laptop filesystem. Instead it uses **`tish-browser-server`**’s async `fs` API: `mkdir`, `writeFile`, `readDir`, `readFile`. Data lives in IndexedDB, so posts survive reloads but stay inside the browser — same code shape you would use on a server with real paths later.
+
+## Data flow
+
+1. **Seed** — on first load, ensure `/posts` exists and write two starter `.md` files if missing.
+2. **Index** — `readDir` → read each file → parse a tiny YAML-ish frontmatter (`title`, `date`) → sort newest first → render a list.
+
+Frontmatter parsing in the playground is intentionally small (split on `---` lines); chapter 2 replaces the body half with real HTML rendering.
+
+**Playground** (end of page) lists those posts after seeding.
+
 ## Seed the virtual disk
 
 The IndexedDB-backed `fs` from `tish-browser-server` survives reload, so we seed it once and edit posts as files.
@@ -105,7 +122,8 @@ fn BlogIndex() {
 createRoot(document.body).render(BlogIndex)
 :::
 
-You should see a sorted list of two posts (or whatever you've added since). Now we'll render them.
+After opening the Playground you should see a sorted list of two posts (or whatever you've added since). Chapter 2 renders their bodies to HTML.
+
 
 :::quiz{id=cap-blog-01-q1}
 - prompt: Why seed the virtual disk on first load?

@@ -3,7 +3,21 @@ title: "C3 — Blog: Markdown to HTML"
 summary: Render with a small inline parser (or @tishlang/tishdoc-parse).
 ---
 
-The blog uses the **same TishDoc subset** that powers this lesson site itself. The minimal parser ships with `tish-learn`'s app code; for a real generator you'd reach for `tishdoc-parse`. Here we'll inline a small render function so the lesson is self-contained.
+Markdown won the developer-blog wars for the same reason CSV refuses to die: humans can read it diff it and patch it in email threads. The catch is that browsers do not natively "understand" markdown—they want DOM or at least HTML strings.
+
+This chapter is intentionally a **small compiler story**. We walk line-by-line through a hand-rolled `renderMarkdown`, talk about the pipeline from string to `innerHTML`, and emphasize where a production system would bolt on sanitization or swap in `tishdoc-parse`. The Playground is your REPL: bang on edge cases and watch the HTML breathe.
+
+## What this chapter does
+
+The blog uses the **same TishDoc subset** that powers this lesson site. The minimal parser ships with `tish-learn`'s app code; for a real generator you'd reach for `tishdoc-parse`. Here we **inline** a small `renderMarkdown(src) -> html string` so the chapter is self-contained: walk lines, emit headings / paragraphs / lists / fenced blocks, escape HTML in text nodes.
+
+## Pipeline
+
+1. Store markdown strings (from disk in ch.1; here a `SAMPLE` constant).
+2. `renderMarkdown` returns one HTML string.
+3. Preview pane uses `innerHTML` (trusted lesson content only — in your own app, sanitize if users can type arbitrary markdown).
+
+The **Playground** at the bottom of this page is a live textarea + preview split.
 
 ## Tiny markdown render
 
@@ -103,11 +117,12 @@ fn Demo() {
 createRoot(document.body).render(Demo)
 :::
 
-Edit on the left, see HTML on the right.
+In the Playground, edit markdown on the left to see HTML on the right.
 
 :::callout{kind=tip title="Real markdown libraries"}
 A real generator would use `@tishlang/tishdoc-parse` or [`marked`](https://marked.js.org). Our 80 lines covers headings, paragraphs, lists, fenced code, inline bold/code — enough for a personal blog.
 :::
+
 
 :::quiz{id=cap-blog-02-q1}
 - prompt: What's the trade-off in using a tiny custom markdown renderer vs a full library?

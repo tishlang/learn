@@ -3,9 +3,11 @@ title: "C2 — Snake: Juice + persistent score"
 summary: Sound, particles, high score.
 ---
 
-The game works. Now make it **feel** good.
+Playtesters rarely say "the collision math felt correct." They remember the **40-millisecond beep** when you ate, the confetti that rewarded a streak, the high score taunting them from the corner. Game designers call this *juice*: feedback that sells the fantasy without changing the rules.
 
-"Juice" is everything that isn't strictly needed but makes a 30-second arcade game irresistible: a sound on eat, particles flying off the food, a satisfying "you died" screen, persistent high scores.
+You already have a correct simulation. This chapter is product writing disguised as programming—teaching you to layer `AudioContext`, cheap particles, and `localStorage` so a ten-line mechanic feels like an arcade cabinet. The snippets below are modular; wire them in the Playground when you are ready to feel the difference side by side.
+
+Here's the punch list: a sound on eat, particles off the food, an honest game-over state, and a score that survives reloads.
 
 ## Sound on eat
 
@@ -66,6 +68,8 @@ fn saveHigh(n) {
 When `score > high`, save and update.
 
 ## All together
+
+The sections above are the **recipe**; the **Playground** at the bottom of this page is the full game in one place: beep on eat, particles, high score in `localStorage`, and the same loop you built in chapter 2. Read the snippets first so you know what to look for in the file tree.
 
 :::sandbox{kind=ide id=cap-snake-03}
 import { createRoot, useEffect, useState, useRef } from "lattish"
@@ -226,6 +230,7 @@ That's a complete arcade game. Ship it as a static page using the export pattern
 ## Take it real
 
 Bundle the game as a standalone HTML page. The "static-site export" lesson in the beginner track is the recipe — `tish build --target js` your game, drop it in an HTML shell with a single canvas, deploy to GitHub Pages.
+
 
 :::quiz{id=cap-snake-03-q1}
 - prompt: What does "juice" mean in game design?

@@ -3,20 +3,38 @@ title: "C6 — Game engine: Renderer"
 summary: Sprite sheet, batched canvas draws.
 ---
 
-A real engine batches draws — issue all sprites for a given texture in one pass, sorted by depth.
+Canvas is a stateful, immediate-mode API—every frame you repaint the world—which sounds wasteful until you remember most 2D sprites are a handful of textured quads. What actually burns performance is **thrashing**: rebinding textures, switching blend modes, scattering tiny draws. Atlases and sorting exist to keep calls coherent.
 
-## Sprite component
+This chapter connects **ECS data** to **pixels**: a `sprite` component describes *what* to draw; a `renderSystem` walks the sprite column, sorts for depth, and issues `drawImage` calls. Gameplay systems never touch the canvas—they only mutate components the renderer reads.
+
+## What the renderer needs from ECS
+
+- **`position`** — where to draw (world space).
+- **`sprite`** — which image, which rectangle inside that image (`sx, sy, sw, sh`), and an **anchor** so "position" means feet, center, or head consistently.
+
+If an entity has a sprite but no position, we fall back to `(0,0)` in the sample code—you would tighten that in a real engine.
+
+## The `sprite` component (data only)
+
+No methods—just a record the artist (or tooling) fills in:
 
 ```tish
-// add(id, "sprite", { src: "atlas.png", sx, sy, sw, sh, anchor: { x: 0.5, y: 0.5 } })
+// Example attachment:
+// world.add(id, "sprite", {
+//   src: "atlas.png",
+//   sx: 0, sy: 0, sw: 24, sh: 32,
+//   anchor: { x: 0.5, y: 1.0 }   // feet at position
+// })
 ```
 
-`sx, sy, sw, sh` index a region of the atlas. `anchor` aligns the sprite around `position` (0.5/0.5 = centered).
+`anchor.x` / `anchor.y` are **fractions of the sprite width/height**. `(0.5, 0.5)` centers the bitmap on the point; `(0, 0)` top-left; `(0.5, 1)` is common for platformers so the ground contact aligns with `position.y`.
 
-## Render system
+## Loading images once
+
+Browsers decode asynchronously. A tiny cache maps `src` → `HTMLImageElement` so the render pass does not allocate new `Image()` objects every frame—only the first time each atlas URL appears.
 
 ```tish
-const images = {}  // src → HTMLImageElement
+const images = {}
 fn loadImage(src) {
   if (src in images) { return images[src] }
   const img = new Image()
@@ -24,12 +42,22 @@ fn loadImage(src) {
   images[src] = img
   return img
 }
+```
 
+`img.complete` tells you whether the first paint can happen this frame; until then you skip or draw a placeholder.
+
+## The render pass (shape, not magic)
+
+1. Clear the framebuffer (solid color).
+2. Collect every entity with a `sprite` component.
+3. Sort by a depth key—here we use `position.y` so lower objects draw later and appear "in front" in a side view (naive but predictable).
+4. For each entry, `drawImage` from atlas sub-rect to world position minus anchor offset.
+
+```tish
 fn renderSystem(world, dt, ctx) {
   ctx.fillStyle = "#0f1114"
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
   const entries = world.all("sprite")
-  // Sort by `position.y` for naive depth.
   entries.sort((a, b) => {
     const idA = parseInt(a[0], 10)
     const idB = parseInt(b[0], 10)
@@ -53,11 +81,14 @@ fn renderSystem(world, dt, ctx) {
 }
 ```
 
-`renderSystem` is **special** — it takes the canvas context as an extra arg. We register it slightly differently than gameplay systems (most engines split "logic" and "render" passes).
+`renderSystem` takes `ctx` as an extra argument—**render passes are special** in most engines: they run after simulation, read mostly-read-only component snapshots, and talk to GPU or canvas APIs. Gameplay systems stay pure-ish logic.
 
-## Sprite atlases keep things fast
+## Why atlases?
 
-A single 1024×1024 PNG holding every frame of every animation, indexed by `(sx, sy, sw, sh)`. The browser caches the texture once; every `drawImage` is a near-zero-cost blit.
+A single 1024×1024 sheet holding every tile and animation frame means **one** decode, **one** texture cache entry, and many cheap blits. Separate PNGs per sprite multiply loads and state changes. Artists export one atlas; code indexes rectangles—same idea as CSS spritesheets on the web.
+
+You will wire this renderer into the same `world.tick` loop in the final chapter's Playground, alongside physics—order matters: simulate, then draw.
+
 
 :::quiz{id=cap-game-02-q1}
 - prompt: Why use a sprite atlas instead of one image per sprite?

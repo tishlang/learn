@@ -3,13 +3,11 @@ title: "C3 — Blog: Download as a real zip"
 summary: A pure-Tish minimal store-zip writer + browser download.
 ---
 
-Browsers don't ship with a zip writer, so we write a tiny one. The format is documented; for the "store" method (no compression) it's:
+ZIP is one of those formats everyone recognizes and almost nobody implements twice. That is a shame, because the **store** variant—the one without DEFLATE compression—is mostly bookkeeping: write a per-file header, remember offsets, then emit a central directory so unzip tools can seek. Doing it in Tish demystifies what `archive.zip` actually is: bytes laid out the way an 80s spec said, still honored by every OS.
 
-- Per file: a 30-byte local header + filename + content.
-- Then a "central directory" listing each file.
-- Finally an "end of central directory" record.
+We will not ask you to memorize PK signatures. The goal is confidence: when you call `downloadZip(files)` downstream, you know it is buffers you concatenated—not a mystery dependency. Import `tish-zip-writer` if you prefer the audited reference.
 
-That's a real, openable `.zip`.
+The on-disk story, in prose: each file earns a thirty-byte **local header** plus bytes; the archive ends with a **central directory** that points back at those offsets and a tiny **end record** ZIP readers hunt for backwards. Ship that shape and Finder, Explorer, and `unzip` all agree it is legitimate.
 
 ## The writer (store mode, ~120 lines)
 
@@ -96,6 +94,7 @@ If you'd rather render at request time:
 ```
 
 Same render functions, real HTTP. Build with `tish build server.tish -o blog --feature http,fs`, deploy as a single binary.
+
 
 :::quiz{id=cap-blog-04-q1}
 - prompt: What's the simplest no-backend way to put a generated static site on the internet?

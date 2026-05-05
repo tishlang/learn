@@ -11,9 +11,23 @@ You'll build:
 - A WebRTC paste-the-offer flow for cross-device, no signaling server.
 :::
 
+Collaborative drawing apps look like exotic WebRTC demos, yet the honest core is mundane: capture pointer samples, interpolate them politely on a canvas, and **treat strokes as serializable structs** rather than unnamed pixels. If you skip that distinction, syncing or undo becomes archaeology.
+
+Chapter 1 stays deliberately offline. You're building the proof that your stroke model survives redraws, palette changes, and clear buttons—the same data you will soon blast across BroadcastChannel packets.
+
 ## The local pad
 
-Strokes are arrays of points. Mouse-down starts a stroke, mouse-move appends, mouse-up ends.
+Strokes are arrays of points. Mouse-down starts a stroke, mouse-move appends, mouse-up ends. We keep **`strokes`** as an array of `{ color, points: [{x,y}, ...] }` so we can redraw after clear, resize, or (next chapter) replay packets from another tab.
+
+Minimal event flow:
+
+```tish
+// on mousedown: start new stroke with first point
+// on mousemove: append to current stroke + redraw whole canvas
+// on mouseup / leave: commit stroke (current = null)
+```
+
+**Playground** at the end: color picker, clear, and a 600×400 canvas.
 
 :::sandbox{kind=ide id=cap-wb-01}
 import { createRoot, useRef, useState } from "lattish"
@@ -89,7 +103,8 @@ fn PadApp() {
 createRoot(document.body).render(PadApp)
 :::
 
-You can draw. Each stroke is a serializable object. Next chapter: broadcast strokes to other tabs.
+In the Playground you can draw freely. Each stroke is a serializable object. Next chapter: broadcast strokes to other tabs.
+
 
 :::quiz{id=cap-wb-01-q1}
 - prompt: Why store strokes as `{color, points: [...]}` instead of drawing directly?
