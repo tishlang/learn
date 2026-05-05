@@ -153,7 +153,12 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 .ll-track-page-blurb { color: var(--text-muted); margin: 0.5rem 0 2rem 0; }
 .ll-track-section { margin-bottom: 2rem; }
 .ll-track-section-title { font-size: 1rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.75rem 0; }
-.ll-chap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.5rem; }
+.ll-chap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 760px;
+}
 .ll-chap-card {
   display: flex; gap: 0.75rem; padding: 0.75rem;
   background: var(--surface); border: 1px solid var(--border);

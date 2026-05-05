@@ -130,6 +130,10 @@ fn corsHeaders() {
 }
 ```
 
+### Optional: swap IndexedDB for Postgres
+
+The in-browser capstone keeps `notes` in RAM (or you extended it with the virtual `fs` / IndexedDB patterns from earlier chapters). On a real server, point the same route handlers at **`@tishlang/pg`**: `connect(process.env.DATABASE_URL)`, `prepare` once at startup, and inside `GET /api/notes` call `queryPrepared` instead of returning the in-memory array. Build with **`--feature http,pg`** (plus whatever else you use). See the [@tishlang/pg module](/modules/tish-pg/01-connect-and-query) for a full walk-through.
+
 That's it. Same handler code. Same client code.
 
 :::quiz{id=cap-rest-03-q1}

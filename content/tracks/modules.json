@@ -1,6 +1,6 @@
 {
   "title": "Modules",
-  "description": "Deep-dives into the Tish ecosystem packages: Lattish (UI), tish-tailwind (CSS), tish-browser-server (in-browser shims), tish-creator (TishDoc markdown), tish-ide-panels (editor + runner).",
+  "description": "Deep-dives into the Tish ecosystem packages: Lattish (UI), tish-tailwind (CSS), tish-browser-server (in-browser shims), tish-creator (TishDoc markdown), tish-ide-panels (editor + runner), @tishlang/pg (PostgreSQL).",
   "parts": [
     {
       "title": "Lattish — UI runtime",
@@ -36,6 +36,14 @@
       "title": "tish-ide-panels — editor + runner",
       "chapters": [
         { "id": "tish-ide-panels/01-editor-and-runner", "title": "Editor and runner", "summary": "EditorPanel, MiniRunner, runVm; build a REPL in 40 lines." }
+      ]
+    },
+    {
+      "title": "@tishlang/pg — PostgreSQL",
+      "chapters": [
+        { "id": "tish-pg/01-connect-and-query", "title": "Connect and query", "summary": "Install @tishlang/pg, connect, read rows." },
+        { "id": "tish-pg/02-prepared-and-pipelines", "title": "Prepared statements and pipelined batches", "summary": "prepare, queryPrepared, queryAll." },
+        { "id": "tish-pg/03-migrations", "title": "Migrations", "summary": "Idempotent runner over a directory of SQL files." }
       ]
     }
   ]

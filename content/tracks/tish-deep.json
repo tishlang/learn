@@ -30,6 +30,7 @@
         { "id": "13-http-client", "title": "HTTP client", "summary": "fetch, ReadableStream body, single-consumer rule." },
         { "id": "14-http-server", "title": "HTTP server", "summary": "serve(port, handler)." },
         { "id": "15-fs", "title": "Filesystem", "summary": "readFile / writeFile / readDir." },
+        { "id": "15a-postgres", "title": "PostgreSQL", "summary": "@tishlang/pg: connect, prepare, queryPrepared, migrate." },
         { "id": "16-process", "title": "Process", "summary": "argv, env, cwd, exit." },
         { "id": "17-regex", "title": "RegExp", "summary": "The regex feature flag." },
         { "id": "18-feature-flags", "title": "Feature flags", "summary": "Secure-by-default I/O." }
