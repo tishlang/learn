@@ -46,14 +46,17 @@
 //   { kind: "directive_leaf",  name: string, attrs: {...} }
 //   { kind: "frontmatter", text: string }   // YAML/JSON, not parsed further
 
-import { highlightToHtml } from "tish-ide-panels"
+// Deep file import (not `tish-ide-panels` barrel): the package entry pulls
+// SandboxIde and the whole IDE graph, which breaks `tish run` prerender and
+// bloats the learn bundle. The resolver does not yet honor `exports` subpaths.
+import { highlightToHtml } from "../node_modules/tish-ide-panels/src/highlight/TishHighlight.tish"
 
 fn isWs(c) {
   return c === " " || c === "\t" || c === "\r" || c === "\n"
 }
 
 fn isAlphaNum(c) {
-  if (c === null || c === undefined || c.length === 0) { return false }
+  if (c === null || typeof c !== "string" || c.length === 0) { return false }
   return (c >= "0" && c <= "9") || (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
 }
 
@@ -78,7 +81,7 @@ fn startsWith(s, prefix) {
 // Unescape backslash-escapes inside an attribute value: `\n`, `\t`, `\r`,
 // `\"`, `\'`, `\\`. Anything else is kept literal (including the backslash).
 fn unescapeAttr(s) {
-  if (s === null || s === undefined) { return "" }
+  if (s === null) { return "" }
   if (s.indexOf("\\") < 0) { return s }
   let out = ""
   let i = 0
@@ -260,7 +263,7 @@ fn isTableSeparator(line) {
 
 // Parse YAML/JSON frontmatter at the top of the document. Returns { meta, body }.
 export fn splitFrontmatter(src) {
-  if (src === null || src === undefined) { return { meta: "", body: "" } }
+  if (src === null || typeof src === "undefined") { return { meta: "", body: "" } }
   let s = typeof src === "string" ? src : String(src)
   let lines = s.split("\n")
   if (lines.length === 0) { return { meta: "", body: src } }
@@ -281,7 +284,7 @@ export fn splitFrontmatter(src) {
 }
 
 export fn parseDocument(src) {
-  if (src === null || src === undefined) { return [] }
+  if (src === null || typeof src === "undefined") { return [] }
   let s = typeof src === "string" ? src : String(src)
   let split = splitFrontmatter(s)
   let body = split.body
@@ -449,8 +452,8 @@ fn escapeMd(s) {
 // nicely); CSS/SCSS use the CSS tokenizer; everything else is plain escaped
 // text.
 fn renderCodeBody(text, lang) {
-  if (text === null || text === undefined) { return "" }
-  let l = lang === null || lang === undefined ? "" : String(lang).toLowerCase()
+  if (text === null || typeof text === "undefined") { return "" }
+  let l = lang === null || typeof lang === "undefined" ? "" : String(lang).toLowerCase()
   let isTishLike = l === "" || l === "tish" || l === "tishlang" || l === "js" || l === "javascript" || l === "ts" || l === "typescript" || l === "jsx" || l === "tsx"
   let isCss = l === "css" || l === "scss"
   if (isTishLike) {
@@ -768,7 +771,7 @@ export fn blockToHtml(block) {
       r = r + 1
     }
     tbody = tbody + "</tbody>"
-    return "<table class=\"md-table\">" + thead + tbody + "</table>"
+    return "<div class=\"md-table-scroll\"><table class=\"md-table\">" + thead + tbody + "</table></div>"
   }
   return ""
 }

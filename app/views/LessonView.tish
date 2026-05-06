@@ -6,7 +6,7 @@
 
 import { useRef, useLayoutEffect } from "lattish"
 import { parseDocument, blockToHtml } from "../tishdoc.tish"
-import { navigate } from "../router.tish"
+import { navigate, buildPath } from "../router.tish"
 import { isComplete, markComplete, markIncomplete } from "../progress.tish"
 import { opt } from "../utils/objects.tish"
 
@@ -166,18 +166,19 @@ fn parseBlanksBody(body) {
   return { template: template, blanks: blanks }
 }
 
-fn renderBlock(block, track, chapter) {
+fn renderBlock(block, track, chapter, blockIndex) {
   if (block.kind === "directive_block" || block.kind === "directive_leaf") {
     let name = block.name
     let attrs = block.attrs
     let body = "body" in block ? block.body : ""
 
-    // Each directive uses its `id` attr (when present) as the Lattish `key`
-    // so navigating between lessons gives every directive a fresh scope
-    // rather than reusing state slots from a same-position directive in the
-    // previously-rendered lesson. For directives without an id we fall back
-    // to a per-lesson + position key so identity is still stable.
-    let posKey = (track !== null ? track : "") + "/" + (chapter !== null ? chapter : "") + "/" + name
+    // Lattish child scopes are keyed from JSX `key`. Fallback `posKey` includes
+    // the block index so same-named directives (e.g. several `:::callout`) are
+    // never aliased. When the author sets `id`, we still prefix the block index
+    // so two directives with the same id in one file cannot share one scope.
+    let posKey = (track !== null ? track : "") + "/" + (chapter !== null ? chapter : "") + "/" + name + "#" + String(blockIndex)
+    let idAttr = opt(attrs, "id", "")
+    let renderKey = idAttr !== "" ? (String(blockIndex) + ":" + idAttr) : posKey
     if (name === "callout") {
       let bodyParsed = parseDocument(body)
       let bodyHtml = ""
@@ -188,19 +189,19 @@ fn renderBlock(block, track, chapter) {
         }
         i = i + 1
       }
-      return <Callout key={opt(attrs, "id", posKey)} attrs={attrs} bodyHtml={bodyHtml} />
+      return <Callout key={renderKey} attrs={attrs} bodyHtml={bodyHtml} />
     }
     if (name === "tryit") {
-      return <TryIt key={opt(attrs, "id", posKey)} attrs={attrs} body={body} />
+      return <TryIt key={renderKey} attrs={attrs} body={body} />
     }
     if (name === "exercise") {
-      return <Exercise key={opt(attrs, "id", posKey)} attrs={attrs} body={body} track={track} chapter={chapter} />
+      return <Exercise key={renderKey} attrs={attrs} body={body} track={track} chapter={chapter} />
     }
     if (name === "quiz") {
-      return <Quiz key={opt(attrs, "id", posKey)} attrs={attrs} body={body} track={track} chapter={chapter} />
+      return <Quiz key={renderKey} attrs={attrs} body={body} track={track} chapter={chapter} />
     }
     if (name === "sandbox") {
-      return <Sandbox key={opt(attrs, "id", posKey)} attrs={attrs} body={body} />
+      return <Sandbox key={renderKey} attrs={attrs} body={body} />
     }
     if (name === "project") {
       let bodyParsed = parseDocument(body)
@@ -210,7 +211,7 @@ fn renderBlock(block, track, chapter) {
         if (bodyParsed[i].kind !== "frontmatter") { bodyHtml = bodyHtml + blockToHtml(bodyParsed[i]) }
         i = i + 1
       }
-      return <Project key={opt(attrs, "id", posKey)} attrs={attrs} bodyHtml={bodyHtml} />
+      return <Project key={renderKey} attrs={attrs} bodyHtml={bodyHtml} />
     }
     if (name === "pick") {
       let mode = opt(attrs, "mode", "assemble")
@@ -222,7 +223,7 @@ fn renderBlock(block, track, chapter) {
       if (mode === "blanks") {
         let parsed = parseBlanksBody(body)
         return <PickAssembler
-          key={pickId}
+          key={renderKey}
           id={pickId}
           mode="blanks"
           template={parsed.template}
@@ -246,7 +247,7 @@ fn renderBlock(block, track, chapter) {
       }
       let tokens = tokenizeAssembleBody(canonical)
       return <PickAssembler
-        key={pickId}
+        key={renderKey}
         id={pickId}
         mode="assemble"
         tokens={tokens}
@@ -255,7 +256,7 @@ fn renderBlock(block, track, chapter) {
         onPass={onPass} />
     }
     // Unknown directive: render its body as plain HTML so authors see something.
-    return <div class="ll-unknown-directive">
+    return <div key={renderKey} class="ll-unknown-directive">
       <div class="ll-unknown-directive-name">{":::" + name}</div>
       <pre>{body}</pre>
     </div>
@@ -265,7 +266,7 @@ fn renderBlock(block, track, chapter) {
     return null
   }
 
-  return <HtmlBlock html={blockToHtml(block)} />
+  return <HtmlBlock key={"md-" + String(blockIndex)} html={blockToHtml(block)} />
 }
 
 fn LessonHeader(props) {
@@ -292,6 +293,11 @@ fn LessonHeader(props) {
     }
   }
   let done = isComplete(track, chapter)
+  let markBtnClass = done ? "ll-mark-done ll-mark-done-on" : "ll-mark-done"
+  let markBtnTitle = done
+    ? "Click to mark this chapter as not complete"
+    : "Click to mark this chapter as complete"
+  let markBtnLabel = done ? "✓ Marked complete · click to undo" : "Mark complete"
   fn toggle() {
     if (done) { markIncomplete(track, chapter) }
     else { markComplete(track, chapter) }
@@ -303,11 +309,8 @@ fn LessonHeader(props) {
     </div>
     {title !== "" ? <h1 class="ll-lesson-title">{title}</h1> : null}
     <div class="ll-lesson-actions">
-      <button
-        class={done ? "ll-mark-done ll-mark-done-on" : "ll-mark-done"}
-        onclick={toggle}
-        title={done ? "Click to mark this chapter as not complete" : "Click to mark this chapter as complete"}>
-        {done ? "✓ Marked complete · click to undo" : "Mark complete"}
+      <button class={markBtnClass} onclick={toggle} title={markBtnTitle}>
+        {markBtnLabel}
       </button>
     </div>
   </div>
@@ -356,7 +359,7 @@ fn PrevNext(props) {
   return <nav class="ll-prev-next">
     <div class="ll-prev-next-cell">
       {prev !== null
-        ? <a class="ll-prev-next-link ll-prev-next-prev" href={"/" + track + "/" + prev.id}>
+        ? <a class="ll-prev-next-link ll-prev-next-prev" href={buildPath(track, prev.id)}>
             <span class="ll-prev-next-arrow">{"←"}</span>
             <span class="ll-prev-next-stack">
               <span class="ll-prev-next-label">{"Previous"}</span>
@@ -367,7 +370,7 @@ fn PrevNext(props) {
     </div>
     <div class="ll-prev-next-cell ll-prev-next-cell-right">
       {next !== null
-        ? <a class="ll-prev-next-link ll-prev-next-next" href={"/" + track + "/" + next.id}>
+        ? <a class="ll-prev-next-link ll-prev-next-next" href={buildPath(track, next.id)}>
             <span class="ll-prev-next-stack ll-prev-next-stack-right">
               <span class="ll-prev-next-label">{"Next"}</span>
               <span class="ll-prev-next-title">{next.title}</span>
@@ -421,9 +424,9 @@ export fn LessonView(props) {
         && (b.kind === "directive_block" || b.kind === "directive_leaf")
         && b.name === "sandbox"
       if (deferSandbox) {
-        deferredSandboxes.push(renderBlock(b, track, chapter))
+        deferredSandboxes.push(renderBlock(b, track, chapter, j))
       } else {
-        blocks.push(renderBlock(b, track, chapter))
+        blocks.push(renderBlock(b, track, chapter, j))
       }
     }
     j = j + 1
@@ -433,7 +436,7 @@ export fn LessonView(props) {
 
   let sandboxEnd = null
   if (deferredSandboxes.length > 0) {
-    sandboxEnd = <section class="ll-lesson-sandbox-end" aria-labelledby="ll-lesson-sandbox-end-title">
+    sandboxEnd = <section class="ll-lesson-sandbox-end">
       <h2 id="ll-lesson-sandbox-end-title" class="ll-lesson-sandbox-end-title">{"Playground"}</h2>
       <div class="ll-lesson-sandbox-end-body">{deferredSandboxes}</div>
     </section>

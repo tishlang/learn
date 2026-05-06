@@ -1,0 +1,6 @@
+{
+  "contentDir": "content",
+  "tracksDir": "content/tracks",
+  "outDir": "public",
+  "basePath": "/"
+}

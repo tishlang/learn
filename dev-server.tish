@@ -1,6 +1,6 @@
 // Dev server for tish-learn. Serves public/ + content/.
 // Run: tish run --feature http,fs,process dev-server.tish
-import { fileExists, readFile, isDir } from "fs"
+import { fileExists, isDir } from "fs"
 import { process } from "process"
 import { serve } from "http"
 
@@ -17,7 +17,7 @@ fn opt(o, key, fallback) {
 fn contentType(path) {
   if (path.endsWith(".html")) { return "text/html; charset=utf-8" }
   if (path.endsWith(".css")) { return "text/css; charset=utf-8" }
-  if (path.endsWith(".js")) { return "application/javascript; charset=utf-8" }
+  if (path.endsWith(".js") || path.endsWith(".mjs")) { return "application/javascript; charset=utf-8" }
   if (path.endsWith(".wasm")) { return "application/wasm" }
   if (path.endsWith(".json")) { return "application/json" }
   if (path.endsWith(".tishdoc.md") || path.endsWith(".md")) { return "text/markdown; charset=utf-8" }
@@ -25,10 +25,6 @@ fn contentType(path) {
   if (path.endsWith(".png")) { return "image/png" }
   if (path.endsWith(".ico")) { return "image/x-icon" }
   return "application/octet-stream"
-}
-
-fn isBinary(path) {
-  return path.endsWith(".wasm") || path.endsWith(".png") || path.endsWith(".ico")
 }
 
 fn resolveCandidates(reqPath) {
@@ -56,14 +52,9 @@ fn serveFile(path) {
   // Disable caching during development so browsers always pick up the
   // freshest learn.js / lattish-runtime.js / *.tishdoc.md after a rebuild.
   let headers = { "Content-Type": ct, "Cache-Control": "no-store" }
-  if (isBinary(path)) {
-    return { status: 200, headers: headers, file: path }
-  }
-  let body = readFile(path)
-  if (body !== null && typeof body === "object" && "error" in body) {
-    return { status: 500, body: "Error: " + body["error"] }
-  }
-  return { status: 200, headers: headers, body: body }
+  // Always stream via `file:` so the HTTP host can set correct MIME for ESM
+  // (e.g. `.mjs`) even if header maps from the VM are not forwarded.
+  return { status: 200, headers: headers, file: path }
 }
 
 fn handleRequest(req) {
@@ -73,6 +64,11 @@ fn handleRequest(req) {
     let path = candidates[i]
     if (fileExists(path) && !isDir(path)) { return serveFile(path) }
     i = i + 1
+  }
+  // SSG: prerendered chapter pages live at public/<track>/<chapter>/index.html
+  if (!isAssetPath(req.path) && req.path.length > 1) {
+    let pre = "public" + req.path + "/index.html"
+    if (fileExists(pre) && !isDir(pre)) { return serveFile(pre) }
   }
   // SPA fallback: any non-asset path serves index.html so the History-API
   // router can take it from there.

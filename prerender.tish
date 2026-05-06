@@ -1,0 +1,439 @@
+// Pure-Tish SSG: emit public/<track>/<chapter>/index.html per lesson.
+// Run: tish run --feature fs prerender.tish
+//
+// Uses the same parser + blockToHtml as the in-tab app; highlight comes from
+// tish-ide-panels/highlight only (not the full panels barrel — safe for tish run).
+
+import { readFile, writeFile, readDir, mkdir, fileExists, isDir } from "fs"
+import { parseDocument, splitFrontmatter } from "./app/tishdoc.tish"
+import { parsedToPrerenderArticleHtml } from "./app/prerender_article.tish"
+import { isFileError, opt } from "./app/utils/objects.tish"
+
+// Must match LearnApp.tish `TRACKS` (id, title, emoji) for static header parity.
+const PRERENDER_TRACKS = [
+  { id: "beginner", title: "Learn to code", emoji: "★" },
+  { id: "tish-deep", title: "Tish, in depth", emoji: "▣" },
+  { id: "modules", title: "Modules", emoji: "◇" },
+  { id: "capstones", title: "Capstones", emoji: "▲" }
+]
+
+fn isSubChapterPrerender(id) {
+  if (id === null || id === "") { return false }
+  let i = 0
+  while (i < id.length && id.charAt(i) >= "0" && id.charAt(i) <= "9") {
+    i = i + 1
+  }
+  if (i === 0) { return false }
+  if (i + 1 >= id.length) { return false }
+  let c = id.charAt(i)
+  let isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+  if (!isLetter) { return false }
+  return id.charAt(i + 1) === "-"
+}
+
+fn buildStaticHeaderHtml(activeTrackId) {
+  let brand = "    <a href=\"/\" class=\"ll-brand\">"
+    + "<span class=\"ll-brand-emoji\">⌬</span>"
+    + "<span class=\"ll-brand-text\">tish-learn</span></a>\n"
+  let navOpen = "    <nav class=\"ll-tracks\">\n"
+  let navBody = ""
+  let ti = 0
+  while (ti < PRERENDER_TRACKS.length) {
+    let t = PRERENDER_TRACKS[ti]
+    let active = t.id === activeTrackId
+    let cls = active ? "ll-track-btn ll-track-btn-active" : "ll-track-btn"
+    navBody = navBody + "      <a href=\"/" + t.id + "\" class=\"" + cls + "\">"
+      + "<span class=\"ll-track-emoji\">" + t.emoji + "</span>"
+      + "<span class=\"ll-track-title\">" + escapeHtmlText(t.title) + "</span></a>\n"
+    ti = ti + 1
+  }
+  let navClose = "    </nav>\n"
+  let theme = "    <div class=\"ll-header-right\">"
+    + "<span class=\"ll-theme-toggle ll-theme-toggle-static\" aria-hidden=\"true\">"
+    + "<span class=\"ll-theme-icon\">◐</span>"
+    + "<span class=\"ll-theme-label\">System</span></span></div>\n"
+  return "  <header class=\"ll-header\">\n" + brand + navOpen + navBody + navClose + theme + "  </header>\n"
+}
+
+async fn buildSidebarHtml(contentDir, trackId, chapterId) {
+  let path = contentDir + "/tracks/" + trackId + ".json"
+  let raw = await readFile(path)
+  if (isFileError(raw)) {
+    return "<div class=\"ll-sidebar-empty\">Chapters</div>"
+  }
+  let s = typeof raw === "string" ? raw : String(raw)
+  let manifest = null
+  try {
+    manifest = JSON.parse(s)
+  } catch (e) {
+    manifest = null
+  }
+  if (manifest === null || typeof manifest !== "object") {
+    return "<div class=\"ll-sidebar-empty\">Chapters</div>"
+  }
+  let parts = opt(manifest, "parts", [])
+  let out = "<div class=\"ll-sidebar-tree\">"
+  let p = 0
+  while (p < parts.length) {
+    let part = parts[p]
+    let ptitle = opt(part, "title", "Part " + String(p + 1))
+    let chapters = opt(part, "chapters", [])
+    out = out + "<div class=\"ll-sidebar-group\">"
+    out = out + "<div class=\"ll-sidebar-group-title\">" + escapeHtmlText(ptitle) + "</div>"
+    out = out + "<div class=\"ll-sidebar-group-list\">"
+    let i = 0
+    while (i < chapters.length) {
+      let c = chapters[i]
+      let cid = opt(c, "id", "")
+      let ctitle = opt(c, "title", cid)
+      let href = "/" + trackId + "/" + cid
+      let cls = "ll-chap"
+      if (isSubChapterPrerender(cid)) { cls = cls + " ll-chap-nested" }
+      if (cid === chapterId) { cls = cls + " ll-chap-current" }
+      out = out + "<a class=\"" + cls + "\" href=\"" + escapeHtmlText(href) + "\">"
+        + escapeHtmlText(ctitle) + "</a>"
+      i = i + 1
+    }
+    out = out + "</div></div>"
+    p = p + 1
+  }
+  out = out + "</div>"
+  return out
+}
+
+async fn buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, articleInner) {
+  let header = buildStaticHeaderHtml(trackId)
+  let sidebarInner = await buildSidebarHtml(contentDir, trackId, chapterId)
+  let mainCol = "    <main class=\"ll-main\"><article class=\"ll-lesson\"><div class=\"ll-lesson-body\"><div class=\"ll-md\">"
+    + articleInner + "</div></div></article></main>\n"
+  return "  <div class=\"ll-app\">\n"
+    + header
+    + "  <div class=\"ll-body\">\n"
+    + "    <aside class=\"ll-sidebar\">" + sidebarInner + "</aside>\n"
+    + mainCol
+    + "  </div>\n"
+    + "  </div>\n"
+}
+
+// First JSON string after `:` on a line like `"contentDir": "content",`
+fn quotedStringAfterColon(line) {
+  let colon = line.indexOf(":")
+  if (colon < 0) { return null }
+  let rest = line.substring(colon + 1)
+  let j = 0
+  while (j < rest.length && (rest.charAt(j) === " " || rest.charAt(j) === "\t")) {
+    j = j + 1
+  }
+  if (j >= rest.length || rest.charAt(j) !== "\"") { return null }
+  let start = j + 1
+  let k = start
+  while (k < rest.length && rest.charAt(k) !== "\"") {
+    k = k + 1
+  }
+  if (k <= start) { return null }
+  return rest.substring(start, k)
+}
+
+// Returns [contentDir, outDir] — array avoids host quirks with record property access.
+async fn readLearnPaths() {
+  let raw = await readFile("learn.config.json")
+  if (isFileError(raw)) {
+    console.log("prerender: learn.config.json missing")
+    return ["content", "public"]
+  }
+  let s = typeof raw === "string" ? raw : String(raw)
+  let contentDir = "content"
+  let outDir = "public"
+  let lines = s.split("\n")
+  let i = 0
+  while (i < lines.length) {
+    let line = lines[i]
+    if (line.indexOf("\"contentDir\"") >= 0) {
+      let v = quotedStringAfterColon(line)
+      if (v !== null && v.length > 0) { contentDir = v }
+    }
+    if (line.indexOf("\"outDir\"") >= 0) {
+      let v = quotedStringAfterColon(line)
+      if (v !== null && v.length > 0) { outDir = v }
+    }
+    i = i + 1
+  }
+  return [contentDir, outDir]
+}
+
+fn extractTitle(meta) {
+  // Avoid `=== undefined` here: Tish VM `string === undefined` does not short-circuit safely.
+  if (meta === null || meta === "") { return "" }
+  let lines = meta.split("\n")
+  let i = 0
+  while (i < lines.length) {
+    let line = lines[i]
+    let colon = line.indexOf(":")
+    if (colon > 0) {
+      let key = line.substring(0, colon)
+      let val = line.substring(colon + 1)
+      while (val.length > 0 && val.charAt(0) === " ") { val = val.substring(1) }
+      while (key.length > 0 && key.charAt(key.length - 1) === " ") {
+        key = key.substring(0, key.length - 1)
+      }
+      if (key === "title") {
+        if (val.length >= 2 && val.charAt(0) === "\"" && val.charAt(val.length - 1) === "\"") {
+          val = val.substring(1, val.length - 1)
+        }
+        return val
+      }
+    }
+    i = i + 1
+  }
+  return ""
+}
+
+async fn ensureParentDirs(filePath) {
+  let parts = filePath.split("/")
+  if (parts.length <= 1) { return }
+  let acc = ""
+  let i = 0
+  while (i < parts.length - 1) {
+    let seg = parts[i]
+    if (seg.length > 0) {
+      if (acc.length > 0) { acc = acc + "/" }
+      acc = acc + seg
+      try {
+        await mkdir(acc)
+      } catch (e) { }
+    }
+    i = i + 1
+  }
+}
+
+// Mirror `content/` → `public/content/` so static servers that only serve
+// `public/` still resolve `/content/tracks/*.json` and lesson `.tishdoc.md`.
+async fn copyContentTreeToPublic(contentDir, outDir) {
+  let dstRoot = outDir + "/content"
+  let entries = await readDir(contentDir)
+  if (isFileError(entries)) {
+    console.log("prerender: cannot read content dir " + contentDir)
+    return
+  }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    if (name === "." || name === ".." || name === ".DS_Store") {
+      i = i + 1
+      continue
+    }
+    await copyContentSubtree(contentDir + "/" + name, dstRoot + "/" + name)
+    i = i + 1
+  }
+  console.log("prerender: synced " + contentDir + "/ → " + dstRoot + "/")
+}
+
+async fn copyContentSubtree(srcPath, dstPath) {
+  if (!fileExists(srcPath)) { return }
+  if (isDir(srcPath)) {
+    try {
+      await mkdir(dstPath)
+    } catch (e) { }
+    let entries = await readDir(srcPath)
+    if (isFileError(entries)) { return }
+    let j = 0
+    while (j < entries.length) {
+      let name = entries[j]
+      if (name === "." || name === ".." || name === ".DS_Store") {
+        j = j + 1
+        continue
+      }
+      await copyContentSubtree(srcPath + "/" + name, dstPath + "/" + name)
+      j = j + 1
+    }
+    return
+  }
+  let raw = await readFile(srcPath)
+  if (isFileError(raw)) { return }
+  let body = typeof raw === "string" ? raw : String(raw)
+  await ensureParentDirs(dstPath)
+  let wr = await writeFile(dstPath, body)
+  if (isFileError(wr)) {
+    console.log("prerender copy error: " + dstPath)
+  }
+}
+
+fn escapeHtmlText(s) {
+  if (s === null) { return "" }
+  let t = String(s)
+  t = t.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;")
+  return t
+}
+
+fn pageHtml(title, shellInnerHtml, chapterMdPath, chapterMdJson) {
+  let t = title.length > 0 ? escapeHtmlText(title) + " — tish-learn" : "tish-learn"
+  let boot = ""
+  if (chapterMdPath !== null && chapterMdPath !== ""
+      && chapterMdJson !== null && chapterMdJson !== "") {
+    // Same path the SPA uses for fetch(); JSON must not contain a raw "</"
+    // sequence or the HTML parser closes this script tag early.
+    boot = "  <script type=\"application/json\" id=\"ll-prerender-chapter-md\" data-path=\""
+      + chapterMdPath + "\">" + chapterMdJson + "</script>\n"
+  }
+  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+    + "  <meta charset=\"utf-8\" />\n"
+    + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
+    + "  <meta name=\"ll-defer-wasm\" content=\"1\" />\n"
+    + "  <title>" + t + "</title>\n"
+    + "  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />\n"
+    + "  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin />\n"
+    + "  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap\" rel=\"stylesheet\" />\n"
+    + "  <link rel=\"stylesheet\" href=\"/base.css\" />\n"
+    + "  <link rel=\"stylesheet\" href=\"/utilities.css\" />\n"
+    + "  <base href=\"/\" />\n"
+    + "</head>\n<body>\n"
+    + "  <div id=\"ll-prerender-root\" class=\"ll-prerender-root ll-prerender-shell\">\n"
+    + shellInnerHtml
+    + "  </div>\n"
+    + "  <div id=\"app\"></div>\n"
+    + boot
+    + "  <script type=\"module\" src=\"/boot.js\"></script>\n"
+    + "</body>\n</html>\n"
+}
+
+async fn prerenderChapter(contentDir, outDir, trackId, chapterId) {
+  let srcPath = contentDir + "/" + trackId + "/" + chapterId + ".tishdoc.md"
+  let raw = await readFile(srcPath)
+  if (isFileError(raw)) {
+    return
+  }
+  let fm = splitFrontmatter(raw)
+  let parsed = parseDocument(raw)
+  let article = parsedToPrerenderArticleHtml(parsed, trackId, chapterId)
+  let title = extractTitle(fm.meta)
+  let rawStr = typeof raw === "string" ? raw : String(raw)
+  let mdPath = "/content/" + trackId + "/" + chapterId + ".tishdoc.md"
+  let jsonLine = JSON.stringify(rawStr)
+  let jsonSafe = jsonLine.split("<").join("\\u003c")
+  let shellInner = await buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, article)
+  let html = pageHtml(title, shellInner, mdPath, jsonSafe)
+  let outPath = outDir + "/" + trackId + "/" + chapterId + "/index.html"
+  await ensureParentDirs(outPath)
+  let wr = await writeFile(outPath, html)
+  if (isFileError(wr)) {
+    console.log("prerender write error: " + outPath)
+  } else {
+    console.log("prerender: " + outPath)
+  }
+}
+
+async fn walkLessonFiles(contentDir, outDir, trackId, dir, basePrefix) {
+  let entries = await readDir(dir)
+  if (isFileError(entries)) { return }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    let full = dir + "/" + name
+    if (name === "." || name === "..") {
+      i = i + 1
+      continue
+    }
+    if (fileExists(full) && !isDir(full)) {
+      if (name.endsWith(".tishdoc.md")) {
+        let stem = name.substring(0, name.length - 11)
+        let chapterId = basePrefix.length > 0 ? basePrefix + "/" + stem : stem
+        await prerenderChapter(contentDir, outDir, trackId, chapterId)
+      }
+      i = i + 1
+      continue
+    }
+    if (isDir(full)) {
+      let nextBase = basePrefix.length > 0 ? basePrefix + "/" + name : name
+      await walkLessonFiles(contentDir, outDir, trackId, full, nextBase)
+    }
+    i = i + 1
+  }
+}
+
+async fn walkTrack(contentDir, outDir, trackId) {
+  let root = contentDir + "/" + trackId
+  if (!fileExists(root) || !isDir(root)) {
+    return
+  }
+  let entries = await readDir(root)
+  if (isFileError(entries)) { return }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    let full = root + "/" + name
+    if (name.endsWith(".tishdoc.md") && fileExists(full) && !isDir(full)) {
+      let stem = name.substring(0, name.length - 11)
+      await prerenderChapter(contentDir, outDir, trackId, stem)
+    } else if (isDir(full)) {
+      await walkLessonFiles(contentDir, outDir, trackId, full, name)
+    }
+    i = i + 1
+  }
+}
+
+async fn walkAllTracks(contentDir, outDir) {
+  let entries = await readDir(contentDir)
+  if (isFileError(entries)) {
+    console.log("prerender: cannot read " + contentDir)
+    return
+  }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    if (name === "tracks" || name === ".DS_Store") {
+      i = i + 1
+      continue
+    }
+    let full = contentDir + "/" + name
+    if (isDir(full)) {
+      await walkTrack(contentDir, outDir, name)
+    }
+    i = i + 1
+  }
+}
+
+// Router serves /<track> as the track picker + sidebar (view: "track").
+// Static hosts have no SPA fallback for /tish-deep — they need a real file
+// at public/<track>/index.html (same shell as site root).
+async fn emitTrackIndexShells(contentDir, outDir) {
+  let shellRaw = await readFile(outDir + "/index.html")
+  if (isFileError(shellRaw)) {
+    console.log("prerender: skip track index shells — missing " + outDir + "/index.html")
+    return
+  }
+  let shell = typeof shellRaw === "string" ? shellRaw : String(shellRaw)
+  let entries = await readDir(contentDir)
+  if (isFileError(entries)) { return }
+  let i = 0
+  while (i < entries.length) {
+    let name = entries[i]
+    if (name === "tracks" || name === "partials" || name === ".DS_Store") {
+      i = i + 1
+      continue
+    }
+    let full = contentDir + "/" + name
+    if (isDir(full)) {
+      let outPath = outDir + "/" + name + "/index.html"
+      await ensureParentDirs(outPath)
+      let wr = await writeFile(outPath, shell)
+      if (isFileError(wr)) {
+        console.log("prerender track shell write error: " + outPath)
+      } else {
+        console.log("prerender track shell: " + outPath)
+      }
+    }
+    i = i + 1
+  }
+}
+
+async fn main() {
+  let paths = await readLearnPaths()
+  let contentDir = paths[0]
+  let outDir = paths[1]
+  await copyContentTreeToPublic(contentDir, outDir)
+  await walkAllTracks(contentDir, outDir)
+  await emitTrackIndexShells(contentDir, outDir)
+  console.log("prerender done.")
+}
+
+await main()

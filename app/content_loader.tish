@@ -5,6 +5,35 @@ import { useState, useLayoutEffect } from "lattish"
 
 let cache = {}
 
+// Prerendered chapter HTML embeds the same markdown JSON the SPA would
+// fetch from `/content/...tishdoc.md`. Consume it once so the client mounts
+// with full LessonView (TryIt, sandbox, …) immediately instead of flashing
+// static HTML then reloading from the network.
+fn readChapterBootstrapConsume(path) {
+  if (path in cache && "text" in cache[path]) {
+    return cache[path]["text"]
+  }
+  if (typeof document === "undefined") { return null }
+  if (path === null || path === undefined || path === "") { return null }
+  if (path.indexOf("/content/") !== 0) { return null }
+  if (!path.endsWith(".tishdoc.md")) { return null }
+  let el = document.getElementById("ll-prerender-chapter-md")
+  if (el === null || el === undefined) { return null }
+  let dp = el.getAttribute("data-path")
+  if (dp !== path) { return null }
+  try {
+    let txt = JSON.parse(el.textContent || "\"\"")
+    let text = txt !== null && txt !== undefined ? String(txt) : ""
+    cache[path] = { text: text }
+    try {
+      el.remove()
+    } catch (e) { }
+    return text
+  } catch (e) {
+    return null
+  }
+}
+
 export async fn loadText(path) {
   if (path in cache) { return cache[path] }
   try {
@@ -39,13 +68,36 @@ export async fn loadJson(path) {
 
 // Hook: returns { state, text, error } for a given path.
 export fn useTextResource(path) {
-  let stateRef = useState({ state: "loading", text: "", error: "" })
+  let initial = { state: "idle", text: "", error: "" }
+  if (path !== null && path !== undefined && path !== "") {
+    let b = readChapterBootstrapConsume(path)
+    if (b !== null) {
+      initial = { state: "ready", text: b, error: "" }
+    } else {
+      initial = { state: "loading", text: "", error: "" }
+    }
+  }
+  let stateRef = useState(initial)
   let s = stateRef[0]
   let setS = stateRef[1]
 
   useLayoutEffect(() => {
     if (path === null || path === undefined || path === "") {
       setS({ state: "idle", text: "", error: "" })
+      return () => {}
+    }
+    if (path in cache && "text" in cache[path]) {
+      let t = cache[path]["text"]
+      setS({ state: "ready", text: t, error: "" })
+      return () => {}
+    }
+    if (path in cache && "error" in cache[path]) {
+      setS({ state: "error", text: "", error: cache[path]["error"] })
+      return () => {}
+    }
+    let boot = readChapterBootstrapConsume(path)
+    if (boot !== null) {
+      setS({ state: "ready", text: boot, error: "" })
       return () => {}
     }
     setS({ state: "loading", text: "", error: "" })

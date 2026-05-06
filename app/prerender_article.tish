@@ -1,0 +1,94 @@
+// Static HTML for lesson bodies at SSG time: markdown via blockToHtml;
+// callout/project get the same shells as runtime; other directives → placeholders.
+
+import { parseDocument, blockToHtml, renderInline } from "./tishdoc.tish"
+import { opt } from "./utils/objects.tish"
+
+fn htmlAttr(s) {
+  if (s === null) { return "" }
+  let t = String(s)
+  t = t.split("&").join("&amp;").split("\"").join("&quot;").split("<").join("&lt;")
+  return t
+}
+
+fn directivePrerender(block, track, chapter) {
+  let name = block.name
+  let attrs = block.attrs
+  let body = "body" in block ? block.body : ""
+
+  if (name === "callout") {
+    let kind = opt(attrs, "kind", "info")
+    let title = opt(attrs, "title", "")
+    let innerParsed = parseDocument(body)
+    let bodyHtml = ""
+    let j = 0
+    while (j < innerParsed.length) {
+      if (innerParsed[j].kind !== "frontmatter") {
+        bodyHtml = bodyHtml + blockToHtml(innerParsed[j])
+      }
+      j = j + 1
+    }
+    let titleHtml = title !== ""
+      ? "<div class=\"dir-callout-title\">" + renderInline(title) + "</div>"
+      : ""
+    return "<aside class=\"dir-callout dir-callout-" + htmlAttr(kind) + "\">"
+      + titleHtml
+      + "<div class=\"dir-callout-body\">" + bodyHtml + "</div></aside>"
+  }
+
+  if (name === "project") {
+    let title = opt(attrs, "title", "Project")
+    let time = opt(attrs, "time", "")
+    let difficulty = opt(attrs, "difficulty", "")
+    let summary = opt(attrs, "summary", "")
+    let innerParsed = parseDocument(body)
+    let bodyHtml = ""
+    let j = 0
+    while (j < innerParsed.length) {
+      if (innerParsed[j].kind !== "frontmatter") {
+        bodyHtml = bodyHtml + blockToHtml(innerParsed[j])
+      }
+      j = j + 1
+    }
+    let meta = "<div class=\"dir-project-meta\">"
+    if (time !== "") {
+      meta = meta + "<span class=\"dir-project-chip\">⏱ " + renderInline(time) + "</span>"
+    }
+    if (difficulty !== "") {
+      meta = meta + "<span class=\"dir-project-chip\">" + renderInline(difficulty) + "</span>"
+    }
+    meta = meta + "</div>"
+    let sumHtml = summary !== ""
+      ? "<p class=\"dir-project-summary\">" + renderInline(summary) + "</p>"
+      : ""
+    return "<div class=\"dir-project\">" + meta
+      + "<h1 class=\"dir-project-title\">" + renderInline(title) + "</h1>"
+      + sumHtml
+      + "<div class=\"dir-project-body\">" + bodyHtml + "</div></div>"
+  }
+
+  let tq = htmlAttr(track !== null ? track : "")
+  let cq = htmlAttr(chapter !== null ? chapter : "")
+  return "<div class=\"ll-island-placeholder\" data-ll-directive=\"" + htmlAttr(name)
+    + "\" data-ll-track=\"" + tq + "\" data-ll-chapter=\"" + cq
+    + "\"><p class=\"ll-island-hint\">Interactive content loads when the app is ready.</p></div>"
+}
+
+export fn parsedToPrerenderArticleHtml(parsed, track, chapter) {
+  let out = ""
+  let i = 0
+  while (i < parsed.length) {
+    let block = parsed[i]
+    if (block.kind === "frontmatter") {
+      i = i + 1
+      continue
+    }
+    if (block.kind === "directive_block" || block.kind === "directive_leaf") {
+      out = out + directivePrerender(block, track, chapter)
+    } else {
+      out = out + blockToHtml(block)
+    }
+    i = i + 1
+  }
+  return out
+}

@@ -1,0 +1,10 @@
+// Standalone sandbox entry — smaller than full LearnApp (no lesson chrome).
+import { createRoot } from "lattish"
+import { StandalonePage } from "tish-ide-panels"
+
+const root = document.getElementById("app")
+createRoot(root).render(
+  <div class="ll-app ll-app-sandbox">
+    {StandalonePage({})}
+  </div>
+)

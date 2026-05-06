@@ -24,8 +24,8 @@ build-runtime:
         -o "{{ justfile_directory() }}/public/dist/lattish-runtime.js" \
         --target js
 
-# Compile the tish-learn UI app -> public/dist/learn.js
-build-app: build-runtime
+# Compile the tish-learn UI app -> public/dist/learn.js (depends on sandbox split + iframe runtime).
+build-app: build-runtime build-sandbox
     mkdir -p "{{ justfile_directory() }}/public/dist"
     tish build "{{ justfile_directory() }}/app/main.tish" \
         -o "{{ justfile_directory() }}/public/dist/learn.js" \
@@ -56,16 +56,27 @@ build-compiler:
     wasm-bindgen "{{ CARGO_TARGET_DIR }}/wasm32-unknown-unknown/release/tishlang_compiler_wasm.wasm" \
         --out-dir "{{ justfile_directory() }}/public/dist" --out-name tish_compiler --target web
 
+# Static HTML per chapter (pure Tish: prerender.tish + same parser as the app).
+build-prerender:
+    tish run --feature fs "{{ justfile_directory() }}/prerender.tish"
+
+# Standalone /sandbox bundle (code-split from main learn.js).
+build-sandbox:
+    mkdir -p "{{ justfile_directory() }}/public/dist"
+    tish build "{{ justfile_directory() }}/app/main_sandbox.tish" \
+        -o "{{ justfile_directory() }}/public/dist/learn_sandbox.js" \
+        --target js
+
 # Everything.
-build: build-app build-sw build-css build-vm build-compiler
+build: build-app build-sw build-css build-vm build-compiler build-prerender
 
 # Build then serve. Default port 8765 (override with PORT=...).
 dev: build
     tish run --feature fs --feature http --feature process "{{ justfile_directory() }}/dev-server.tish"
 
 # Quick rebuild of just the Tish app + CSS (skip Rust toolchain).
-quick: build-app build-css
+quick: build-app build-sandbox build-css build-prerender
 
 # Wipe build outputs.
 clean:
-    rm -rf "{{ justfile_directory() }}/public/dist" "{{ justfile_directory() }}/public/learn.css"
+    rm -rf "{{ justfile_directory() }}/public/dist" "{{ justfile_directory() }}/public/learn.css" "{{ justfile_directory() }}/public/content"

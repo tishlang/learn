@@ -2,7 +2,6 @@
 // Routes #/, #/<track>, #/<track>/<chapter>.
 
 import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
-import { StandalonePage } from "tish-ide-panels"
 import { useRoute, navigate, navigateRaw } from "./router.tish"
 import { useJsonResource, useTextResource, chapterUrl, trackManifestUrl } from "./content_loader.tish"
 import { completedChapters, useProgressVersion } from "./progress.tish"
@@ -202,6 +201,14 @@ export fn LearnApp() {
   let themeState = useState(loadTheme())
   let theme = themeState[0]
   let setTheme = themeState[1]
+  // Hide SSG shell only once the client can replace it (avoids empty #app flash
+  // on chapter loads and prevents re-showing static HTML on client nav).
+  let prerenderShellHiddenRef = useRef(false)
+  // Preserve chapter list scroll across client navigations (same track).
+  let sidebarElRef = useRef(null)
+  let sidebarScrollTopRef = useRef(0)
+  let sidebarScrollTrackRef = useRef("")
+  let mainElRef = useRef(null)
 
   // Apply on every theme change. When the user cycles to a fixed value
   // ("dark"/"light") we just override; when they cycle back to "system" we
@@ -233,6 +240,16 @@ export fn LearnApp() {
     return () => document.removeEventListener("click", onClick)
   }, [])
 
+  // Full SPA on /sandbox would duplicate the standalone bundle; hard-navigate
+  // so public/boot.js loads learn_sandbox.js (smaller entry).
+  useLayoutEffect(() => {
+    if (route.view !== "sandbox") { return () => {} }
+    if (typeof window === "undefined") { return () => {} }
+    let tail = window.location.search + window.location.hash
+    window.location.replace("/sandbox" + tail)
+    return () => {}
+  }, [route.view])
+
   // While in "system" mode, react to OS preference changes live.
   useLayoutEffect(() => {
     if (theme !== "system") { return () => {} }
@@ -263,18 +280,61 @@ export fn LearnApp() {
     ? chapterUrl(route.track, route.chapter)
     : ""
   let chapterRes = useTextResource(chapterPath)
+
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") { return () => {} }
+    if (prerenderShellHiddenRef.current) { return () => {} }
+    let hide = false
+    if (route.view !== "chapter") {
+      hide = true
+    } else {
+      let chOk = chapterRes.state === "ready" || chapterRes.state === "error"
+      let manOk = manifest.state === "ready" || manifest.state === "error"
+      hide = chOk && manOk
+    }
+    if (!hide) { return () => {} }
+    prerenderShellHiddenRef.current = true
+    document.body.classList.add("ll-learn-app-mounted")
+    return () => {}
+  }, [route.view, chapterRes.state, manifest.state])
+
+  // Restore sidebar scroll after chapter/track updates so innerDOM changes do
+  // not reset scrollTop (felt as a vertical jitter in the nav).
+  useLayoutEffect(() => {
+    let el = sidebarElRef.current
+    if (el === null) { return () => {} }
+    let tid = route.track !== null ? route.track : ""
+    if (tid !== sidebarScrollTrackRef.current) {
+      sidebarScrollTopRef.current = 0
+      sidebarScrollTrackRef.current = tid
+    }
+    el.scrollTop = sidebarScrollTopRef.current
+    return () => {
+      let a = sidebarElRef.current
+      if (a !== null) {
+        sidebarScrollTopRef.current = a.scrollTop
+      }
+    }
+  }, [route.chapter, route.track])
+
+  // Lesson body scrolls inside `.ll-main`, not the window — reset to top on
+  // every in-app navigation so a long chapter does not leave the next lesson
+  // scrolled partway down.
+  useLayoutEffect(() => {
+    let m = mainElRef.current
+    if (m !== null) {
+      m.scrollTop = 0
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0)
+    }
+    return () => {}
+  }, [route.chapter, route.track, route.view])
+
   let parsed = useMemo(() => {
     if (chapterRes.state !== "ready") { return [] }
     return parseDocument(chapterRes.text)
   }, [chapterRes.text, chapterRes.state])
-
-  // Sandbox route is full-screen: bypass the header/sidebar so the standalone
-  // SandboxIde owns the whole viewport (matches tish-playground's chrome).
-  if (route.view === "sandbox") {
-    return <div class="ll-app ll-app-sandbox">
-      {StandalonePage({})}
-    </div>
-  }
 
   let main = null
   if (route.view === "home") {
@@ -292,11 +352,11 @@ export fn LearnApp() {
     <Header theme={theme} setTheme={setTheme} route={route} />
     <div class="ll-body">
       {showSidebar
-        ? <aside class="ll-sidebar">
+        ? <aside class="ll-sidebar" ref={sidebarElRef}>
             <TrackSidebar trackId={route.track} currentChapter={route.chapter} manifest={manifest} />
           </aside>
         : null}
-      <main class="ll-main">{main}</main>
+      <main class="ll-main" ref={mainElRef}>{main}</main>
     </div>
   </div>
 }

@@ -2,7 +2,8 @@
 // instead of `obj.x !== undefined`.
 
 export fn opt(o, key, fallback) {
-  if (o === null || o === undefined) { return fallback }
+  // Avoid `=== undefined` in Tish VM (unsafe with common LHS types).
+  if (o === null) { return fallback }
   if (typeof o !== "object") { return fallback }
   if (key in o) {
     let v = o[key]
@@ -12,7 +13,7 @@ export fn opt(o, key, fallback) {
 }
 
 export fn has(o, key) {
-  if (o === null || o === undefined) { return false }
+  if (o === null) { return false }
   if (typeof o !== "object") { return false }
   return key in o
 }
