@@ -36,10 +36,11 @@ fn TrackContents(props) {
   let done = completedChapters(trackId)
   let sections = []
   let p = 0
+  let stepNum = 0
   while (p < parts.length) {
     let part = parts[p]
     let chapters = opt(part, "chapters", [])
-    let cards = []
+    let steps = []
     let i = 0
     while (i < chapters.length) {
       let c = chapters[i]
@@ -47,18 +48,25 @@ fn TrackContents(props) {
       let ctitle = opt(c, "title", cid)
       let csub = opt(c, "summary", "")
       let isDone = cid in done
-      cards.push(<div class={isDone ? "ll-chap-card ll-chap-card-done" : "ll-chap-card"} onclick={() => navigate(trackId, cid)}>
-        <div class="ll-chap-card-num">{String(i + 1)}</div>
-        <div class="ll-chap-card-body">
-          <div class="ll-chap-card-title">{(isDone ? "✓ " : "") + ctitle}</div>
-          <div class="ll-chap-card-summary">{csub}</div>
+      stepNum = stepNum + 1
+      let rowCls = "ll-roadmap-step"
+      if (isDone) { rowCls = rowCls + " ll-roadmap-step-done" }
+      let nodeCls = "ll-roadmap-node"
+      if (stepNum > 9) { nodeCls = nodeCls + " ll-roadmap-node-2d" }
+      steps.push(<div class={rowCls} onclick={() => navigate(trackId, cid)}>
+        <span class={nodeCls}>{String(stepNum)}</span>
+        <div class="ll-roadmap-main">
+          <div class="ll-roadmap-head">
+            <span class="ll-roadmap-title">{ctitle}</span>
+          </div>
+          {csub !== "" && csub !== null ? <p class="ll-roadmap-sum">{csub}</p> : null}
         </div>
       </div>)
       i = i + 1
     }
     sections.push(<section class="ll-track-section">
       <h2 class="ll-track-section-title">{opt(part, "title", "Part " + String(p + 1))}</h2>
-      <div class="ll-chap-grid">{cards}</div>
+      <div class="ll-roadmap">{steps}</div>
     </section>)
     p = p + 1
   }

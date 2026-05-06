@@ -90,8 +90,13 @@ async fn buildSidebarHtml(contentDir, trackId, chapterId) {
       let cls = "ll-chap"
       if (isSubChapterPrerender(cid)) { cls = cls + " ll-chap-nested" }
       if (cid === chapterId) { cls = cls + " ll-chap-current" }
-      out = out + "<a class=\"" + cls + "\" href=\"" + escapeHtmlText(href) + "\">"
-        + escapeHtmlText(ctitle) + "</a>"
+      let stepCls = "ll-sidebar-step"
+      if (isSubChapterPrerender(cid)) { stepCls = stepCls + " ll-sidebar-step-nested" }
+      let nodeCls = "ll-road-node"
+      if (cid === chapterId) { nodeCls = nodeCls + " ll-road-node-current" }
+      out = out + "<div class=\"" + stepCls + "\"><span class=\"" + nodeCls + "\" aria-hidden=\"true\"></span>"
+        + "<a class=\"" + cls + "\" href=\"" + escapeHtmlText(href) + "\">"
+        + escapeHtmlText(ctitle) + "</a></div>"
       i = i + 1
     }
     out = out + "</div></div>"

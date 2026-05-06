@@ -131,9 +131,15 @@ fn TrackSidebar(props) {
       if (isSubChapter(cid)) { cls = cls + " ll-chap-nested" }
       if (isCurrent) { cls = cls + " ll-chap-current" }
       if (isDone) { cls = cls + " ll-chap-done" }
-      let label = ctitle
-      if (isDone) { label = "✓ " + label }
-      items.push(<button class={cls} onclick={() => navigate(trackId, cid)}>{label}</button>)
+      let nodeCls = "ll-road-node"
+      if (isDone) { nodeCls = nodeCls + " ll-road-node-done" }
+      if (isCurrent) { nodeCls = nodeCls + " ll-road-node-current" }
+      let stepCls = "ll-sidebar-step"
+      if (isSubChapter(cid)) { stepCls = stepCls + " ll-sidebar-step-nested" }
+      items.push(<div class={stepCls}>
+        <span class={nodeCls} />
+        <button class={cls} onclick={() => navigate(trackId, cid)}>{ctitle}</button>
+      </div>)
       i = i + 1
     }
     groups.push(<div class="ll-sidebar-group">

@@ -24,6 +24,9 @@
   --scrollbar-track: oklch(0.16 0 0 / 0.35);
   --scrollbar-size: 7px;
   --scrollbar-radius: 999px;
+  /* Text selection — tishlang.com hero lavender + black text (see tishlang-web globals.css) */
+  --selection-bg: #a881ff;
+  --selection-fg: #000000;
 }
 
 .theme-light {
@@ -40,6 +43,19 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Match tishlang-web: primary-tint fill + black selected text */
+::selection,
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+::-moz-selection,
+*::-moz-selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+
 html, body {
   margin: 0;
   height: 100%;
@@ -213,37 +229,95 @@ a.ll-track-btn { text-decoration: none; color: inherit; }
 .ll-sidebar-group { display: flex; flex-direction: column; gap: 0.15rem; }
 .ll-sidebar-group-title {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-muted); padding: 0 0.75rem; margin-bottom: 0.25rem;
+  color: var(--text-muted); padding: 0 0.75rem; margin-bottom: 0.35rem;
 }
-.ll-sidebar-group-list { display: flex; flex-direction: column; gap: 0.05rem; }
+/* Roadmap — dot column; connectors only *between* dots (no line past first/last) */
+.ll-sidebar-group-list {
+  --ll-node-d: 10px;
+  --ll-rail-w: 2px;
+  --ll-after-node: 0.45rem;
+  /* Node uses margin-left: -(node + after); line must sit on dot center (-after - node/2). */
+  --ll-rail-line-left: calc(
+    -1 * var(--ll-after-node) - var(--ll-node-d) / 2 - var(--ll-rail-w) / 2
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  position: relative;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0 0.35rem calc(var(--ll-node-d) + var(--ll-after-node));
+}
+.ll-sidebar-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.1rem 0;
+}
+.ll-sidebar-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: var(--ll-rail-line-left);
+  top: 0;
+  bottom: 50%;
+  width: var(--ll-rail-w);
+  background: var(--border);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 0;
+}
+.ll-sidebar-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: var(--ll-rail-line-left);
+  top: 50%;
+  bottom: 0;
+  width: var(--ll-rail-w);
+  background: var(--border);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 0;
+}
+.ll-sidebar-step-nested .ll-chap {
+  font-size: 0.82rem;
+  padding-left: 0.65rem;
+}
+.ll-road-node {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: var(--ll-node-d);
+  height: var(--ll-node-d);
+  box-sizing: border-box;
+  border-radius: 50%;
+  margin-left: calc(-1 * var(--ll-node-d) - var(--ll-after-node));
+  background: var(--surface);
+  border: 2px solid var(--border);
+  box-shadow: 0 0 0 1px var(--surface);
+  pointer-events: none;
+}
+.ll-road-node-done {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--surface);
+}
+.ll-road-node-current {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--primary);
+  border-color: var(--primary);
+}
 .ll-chap {
-  display: block; width: 100%; text-align: left;
-  padding: 0.4rem 0.75rem; border: none; background: transparent;
+  display: block; flex: 1; min-width: 0; text-align: left;
+  padding: 0.35rem 0.5rem; border: none; background: transparent;
   color: var(--text); border-radius: 5px; font-size: 0.85rem; line-height: 1.3;
 }
 a.ll-chap { text-decoration: none; color: inherit; box-sizing: border-box; }
 .ll-chap:hover { background: var(--surface-hover); }
 .ll-chap-current { background: var(--primary-soft); }
 .ll-chap-done { color: var(--text-muted); }
-/* Sub-chapters of a section-overview entry (e.g. 26a-26g under 26-build-
-   targets). Indented + accented with a thin left guide so the parent /
-   child relationship is obvious at a glance. */
+/* Nested chapters: indent row only (rail stays aligned) */
 .ll-chap-nested {
-  padding-left: 1.6rem;
   font-size: 0.82rem;
-  position: relative;
-}
-.ll-chap-nested::before {
-  content: "";
-  position: absolute;
-  left: 0.85rem;
-  top: 25%;
-  bottom: 25%;
-  width: 1px;
-  background: var(--border);
-}
-.ll-chap-nested.ll-chap-current::before {
-  background: var(--primary);
 }
 
 .ll-main {
@@ -254,7 +328,12 @@ a.ll-chap { text-decoration: none; color: inherit; box-sizing: border-box; }
 /* Home */
 .ll-home { max-width: 880px; margin: 0 auto; padding: 4rem 1.5rem; }
 .ll-home-title { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 0.5rem 0; }
-.ll-home-tagline { font-size: 1.05rem; color: var(--text-muted); margin: 0 0 2.5rem 0; }
+.ll-home-tagline {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0 0 2.5rem 0;
+}
 .ll-home-tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 .ll-track-card {
   padding: 1.25rem; background: var(--surface);
@@ -266,34 +345,113 @@ a.ll-chap { text-decoration: none; color: inherit; box-sizing: border-box; }
 .ll-track-card-title { font-size: 1.05rem; font-weight: 600; }
 .ll-track-card-subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
 
-/* Track index */
-.ll-track-page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+/* Track index — same column width + centering as lesson articles (`.ll-lesson`) */
+.ll-track-page { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem; }
 .ll-track-page-title { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.ll-track-page-blurb { color: var(--text-muted); margin: 0.5rem 0 2rem 0; }
-.ll-track-section { margin-bottom: 2rem; }
-.ll-track-section-title { font-size: 1rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.75rem 0; }
-.ll-chap-grid {
+.ll-track-page-blurb {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0.5rem 0 2rem 0;
+}
+.ll-track-section { margin-bottom: 2.25rem; }
+.ll-track-section-title { font-size: 1rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.65rem 0; }
+.ll-roadmap {
+  --ll-node-d: 1.875rem;
+  --ll-rail-w: 2px;
+  --ll-after-node: 0.65rem;
+  --ll-rail-line-left: calc(
+    -1 * var(--ll-after-node) - var(--ll-node-d) / 2 - var(--ll-rail-w) / 2
+  );
+  position: relative;
+  width: 100%;
+  padding: 0.35rem 0.5rem 0.5rem calc(var(--ll-node-d) + var(--ll-after-node));
+}
+.ll-roadmap-step {
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  max-width: 760px;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0;
+  cursor: pointer;
+  border-radius: 8px;
+  padding-right: 0.5rem;
+  transition: background 0.12s;
 }
-.ll-chap-card {
-  display: flex; gap: 0.75rem; padding: 0.75rem;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+.ll-roadmap-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: var(--ll-rail-line-left);
+  top: 0;
+  bottom: 50%;
+  width: var(--ll-rail-w);
+  background: var(--border);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 0;
 }
-.ll-chap-card:hover { border-color: var(--primary); background: var(--surface-hover); }
-.ll-chap-card-done { opacity: 0.7; }
-.ll-chap-card-num {
-  flex-shrink: 0; width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--primary-soft); color: var(--primary);
-  border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+.ll-roadmap-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: var(--ll-rail-line-left);
+  top: 50%;
+  bottom: 0;
+  width: var(--ll-rail-w);
+  background: var(--border);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 0;
 }
-.ll-chap-card-title { font-weight: 500; font-size: 0.9rem; }
-.ll-chap-card-summary { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem; }
+.ll-roadmap-step:hover { background: var(--surface-hover); }
+.ll-roadmap-node {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: var(--ll-node-d);
+  height: var(--ll-node-d);
+  box-sizing: border-box;
+  border-radius: 50%;
+  margin-left: calc(-1 * var(--ll-node-d) - var(--ll-after-node));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  box-shadow: 0 0 0 1px var(--bg);
+  pointer-events: none;
+}
+.ll-roadmap-node-2d {
+  font-size: 0.58rem;
+  letter-spacing: -0.04em;
+}
+.ll-roadmap-step-done .ll-roadmap-node {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: oklch(0.11 0 0);
+}
+.ll-roadmap-main { flex: 1; min-width: 0; }
+.ll-roadmap-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+.ll-roadmap-title { font-weight: 500; }
+.ll-roadmap-sum {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.ll-roadmap-step-done .ll-roadmap-title { color: var(--text-muted); }
 
 /* Lesson */
 .ll-lesson { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem; font-size: 16px; line-height: 1.65; }
