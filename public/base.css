@@ -150,6 +150,11 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 /* SSG prerender: hide static HTML once the Lattish app has mounted. */
 .ll-learn-app-mounted .ll-prerender-root { display: none !important; }
+/* Chapter pages ship a full static shell + a hidden #app until handoff, so we
+   do not paint two stacked .ll-app layouts (CLS + double contentful paint). */
+body:has(#ll-prerender-root.ll-prerender-shell):not(.ll-learn-app-mounted) #app {
+  display: none;
+}
 /* Chapter pages: full .ll-app shell (matches LearnApp first paint). */
 .ll-prerender-root.ll-prerender-shell {
   max-width: none;
@@ -458,6 +463,7 @@ a.ll-chap { text-decoration: none; color: inherit; box-sizing: border-box; }
 .ll-lesson-header { margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .ll-lesson-trail { display: flex; gap: 0.75rem; align-items: center; font-size: 0.8rem; color: var(--text-muted); }
 .ll-lesson-back { border: none; background: transparent; color: var(--primary); font-size: 0.8rem; cursor: pointer; padding: 0; }
+a.ll-lesson-back { text-decoration: none; color: var(--primary); }
 .ll-lesson-chapter { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .ll-lesson-title { font-size: 2rem; letter-spacing: -0.02em; margin: 0.25rem 0 0 0; }
 .ll-lesson-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
@@ -473,6 +479,7 @@ a.ll-chap { text-decoration: none; color: inherit; box-sizing: border-box; }
   color: var(--error);
   border-color: color-mix(in oklch, var(--error) 50%, transparent);
 }
+.ll-mark-done-static { pointer-events: none; opacity: 0.88; }
 
 /* Capstones: full IDE deferred to end of lesson (after reading / quizzes) */
 .ll-lesson-sandbox-end {

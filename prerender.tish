@@ -9,6 +9,20 @@ import { parseDocument, splitFrontmatter } from "./app/tishdoc.tish"
 import { parsedToPrerenderArticleHtml } from "./app/prerender_article.tish"
 import { isFileError, opt } from "./app/utils/objects.tish"
 
+fn escapeHtmlText(s) {
+  if (s === null) { return "" }
+  let t = String(s)
+  t = t.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;")
+  return t
+}
+
+fn lessonTitleHtml(lessonTitle) {
+  if (lessonTitle === null || lessonTitle === "") { return "" }
+  let s = String(lessonTitle)
+  if (s.length === 0) { return "" }
+  return "    <h1 class=\"ll-lesson-title\">" + escapeHtmlText(s) + "</h1>\n"
+}
+
 // Must match LearnApp.tish `TRACKS` (id, title, emoji) for static header parity.
 const PRERENDER_TRACKS = [
   { id: "beginner", title: "Learn to code", emoji: "★" },
@@ -106,18 +120,32 @@ async fn buildSidebarHtml(contentDir, trackId, chapterId) {
   return out
 }
 
-async fn buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, articleInner) {
+async fn buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, lessonTitle, articleInner) {
   let header = buildStaticHeaderHtml(trackId)
   let sidebarInner = await buildSidebarHtml(contentDir, trackId, chapterId)
-  let mainCol = "    <main class=\"ll-main\"><article class=\"ll-lesson\"><div class=\"ll-lesson-body\"><div class=\"ll-md\">"
-    + articleInner + "</div></div></article></main>\n"
-  return "  <div class=\"ll-app\">\n"
-    + header
-    + "  <div class=\"ll-body\">\n"
-    + "    <aside class=\"ll-sidebar\">" + sidebarInner + "</aside>\n"
-    + mainCol
-    + "  </div>\n"
-    + "  </div>\n"
+  let backHref = "/" + trackId
+  let backLabel = "← " + escapeHtmlText(trackId)
+  let chapEsc = escapeHtmlText(chapterId)
+  let lh1 = "    <div class=\"ll-lesson-header\">\n"
+  let lh2 = lh1 + "      <div class=\"ll-lesson-trail\">\n"
+  let lh3 = lh2 + "        <a class=\"ll-lesson-back\" href=\"" + escapeHtmlText(backHref) + "\">" + backLabel + "</a>\n"
+  let lh4 = lh3 + "        <span class=\"ll-lesson-chapter\">" + chapEsc + "</span>\n"
+  let lh5 = lh4 + "      </div>\n"
+  let lh6 = lh5 + lessonTitleHtml(lessonTitle)
+  let lh7 = lh6 + "      <div class=\"ll-lesson-actions\">\n"
+  let lh8 = lh7 + "        <button type=\"button\" class=\"ll-mark-done ll-mark-done-static\" disabled title=\"Available when the app finishes loading\">Mark complete</button>\n"
+  let lessonHead = lh8 + "      </div>\n" + "    </div>\n"
+  let mainOpen = "    <main class=\"ll-main\"><article class=\"ll-lesson\">\n"
+  let mainBodyOpen = "    <div class=\"ll-lesson-body\"><div class=\"ll-md\">"
+  let mainClose = "</div></div></article></main>\n"
+  let mainCol = mainOpen + lessonHead + mainBodyOpen + articleInner + mainClose
+  let sh1 = "  <div class=\"ll-app\">\n"
+  let sh2 = sh1 + header
+  let sh3 = sh2 + "  <div class=\"ll-body\">\n"
+  let sh4 = sh3 + "    <aside class=\"ll-sidebar\">" + sidebarInner + "</aside>\n"
+  let sh5 = sh4 + mainCol
+  let sh6 = sh5 + "  </div>\n"
+  return sh6 + "  </div>\n"
 }
 
 // First JSON string after `:` on a line like `"contentDir": "content",`
@@ -263,13 +291,6 @@ async fn copyContentSubtree(srcPath, dstPath) {
   }
 }
 
-fn escapeHtmlText(s) {
-  if (s === null) { return "" }
-  let t = String(s)
-  t = t.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;")
-  return t
-}
-
 fn pageHtml(title, shellInnerHtml, chapterMdPath, chapterMdJson) {
   let t = title.length > 0 ? escapeHtmlText(title) + " — tish-learn" : "tish-learn"
   let boot = ""
@@ -315,7 +336,7 @@ async fn prerenderChapter(contentDir, outDir, trackId, chapterId) {
   let mdPath = "/content/" + trackId + "/" + chapterId + ".tishdoc.md"
   let jsonLine = JSON.stringify(rawStr)
   let jsonSafe = jsonLine.split("<").join("\\u003c")
-  let shellInner = await buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, article)
+  let shellInner = await buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, title, article)
   let html = pageHtml(title, shellInner, mdPath, jsonSafe)
   let outPath = outDir + "/" + trackId + "/" + chapterId + "/index.html"
   await ensureParentDirs(outPath)
