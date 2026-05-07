@@ -1,0 +1,140 @@
+// Static shell for SSG: same DOM shape as LearnApp / LessonView chrome, built with
+// `ssrH` from ssr_h.tish (vnode-compatible with Lattish), serialized via ssr_vnode.tish.
+// `tish run` cannot import the real `lattish` package (it uses `Symbol` for Fragment).
+
+import { ssrH as h } from "./ssr_h.tish"
+import { opt } from "./utils/objects.tish"
+
+// Must match LearnApp.tish `TRACKS` (id, title, emoji) for static header parity.
+export const PRERENDER_TRACKS = [
+  { id: "beginner", title: "Learn to code", emoji: "★" },
+  { id: "tish-deep", title: "Tish, in depth", emoji: "▣" },
+  { id: "modules", title: "Modules", emoji: "◇" },
+  { id: "capstones", title: "Capstones", emoji: "▲" }
+]
+
+export fn isSubChapterPrerender(id) {
+  if (id === null || id === "") { return false }
+  let i = 0
+  while (i < id.length && id.charAt(i) >= "0" && id.charAt(i) <= "9") {
+    i = i + 1
+  }
+  if (i === 0) { return false }
+  if (i + 1 >= id.length) { return false }
+  let c = id.charAt(i)
+  let isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+  if (!isLetter) { return false }
+  return id.charAt(i + 1) === "-"
+}
+
+fn trackButtonsVnode(activeTrackId, idx) {
+  if (idx >= PRERENDER_TRACKS.length) { return [] }
+  let t = PRERENDER_TRACKS[idx]
+  let active = t.id === activeTrackId
+  let cls = active ? "ll-track-btn ll-track-btn-active" : "ll-track-btn"
+  let row = h("a", { href: "/" + t.id, className: cls }, [
+    h("span", { className: "ll-track-emoji" }, [t.emoji]),
+    h("span", { className: "ll-track-title" }, [t.title])
+  ])
+  return [row].concat(trackButtonsVnode(activeTrackId, idx + 1))
+}
+
+export fn siteHeaderVnode(activeTrackId) {
+  return h("header", { className: "ll-header" }, [
+    h("a", { href: "/", className: "ll-brand" }, [
+      h("span", { className: "ll-brand-emoji" }, ["⌬"]),
+      h("span", { className: "ll-brand-text" }, ["tish-learn"])
+    ]),
+    h("nav", { className: "ll-tracks" }, trackButtonsVnode(activeTrackId, 0)),
+    h("div", { className: "ll-header-right" }, [
+      h("span", { className: "ll-theme-toggle ll-theme-toggle-static", "aria-hidden": "true" }, [
+        h("span", { className: "ll-theme-icon" }, ["◐"]),
+        h("span", { className: "ll-theme-label" }, ["System"])
+      ])
+    ])
+  ])
+}
+
+fn sidebarChaptersVnode(chapters, trackId, chapterId, i) {
+  if (i >= chapters.length) { return [] }
+  let c = chapters[i]
+  let cid = opt(c, "id", "")
+  let ctitle = opt(c, "title", cid)
+  let href = "/" + trackId + "/" + cid
+  let cls = "ll-chap"
+  if (isSubChapterPrerender(cid)) { cls = cls + " ll-chap-nested" }
+  if (cid === chapterId) { cls = cls + " ll-chap-current" }
+  let stepCls = "ll-sidebar-step"
+  if (isSubChapterPrerender(cid)) { stepCls = stepCls + " ll-sidebar-step-nested" }
+  let nodeCls = "ll-road-node"
+  if (cid === chapterId) { nodeCls = nodeCls + " ll-road-node-current" }
+  let step = h("div", { className: stepCls }, [
+    h("span", { className: nodeCls, "aria-hidden": "true" }, []),
+    h("a", { className: cls, href: href }, [ctitle])
+  ])
+  return [step].concat(sidebarChaptersVnode(chapters, trackId, chapterId, i + 1))
+}
+
+fn sidebarPartsVnode(parts, trackId, chapterId, p) {
+  if (p >= parts.length) { return [] }
+  let part = parts[p]
+  let ptitle = opt(part, "title", "Part " + String(p + 1))
+  let chapters = opt(part, "chapters", [])
+  let group = h("div", { className: "ll-sidebar-group" }, [
+    h("div", { className: "ll-sidebar-group-title" }, [ptitle]),
+    h("div", { className: "ll-sidebar-group-list" }, sidebarChaptersVnode(chapters, trackId, chapterId, 0))
+  ])
+  return [group].concat(sidebarPartsVnode(parts, trackId, chapterId, p + 1))
+}
+
+export fn sidebarTreeVnode(manifest, trackId, chapterId) {
+  if (manifest === null || typeof manifest !== "object") {
+    return h("div", { className: "ll-sidebar-empty" }, ["Chapters"])
+  }
+  let parts = opt(manifest, "parts", [])
+  return h("div", { className: "ll-sidebar-tree" }, sidebarPartsVnode(parts, trackId, chapterId, 0))
+}
+
+export fn lessonHeaderShellVnode(trackId, chapterId, lessonTitle) {
+  let parts = []
+  parts.push(h("div", { className: "ll-lesson-trail" }, [
+    h("a", { className: "ll-lesson-back", href: "/" + trackId }, ["← " + trackId]),
+    h("span", { className: "ll-lesson-chapter" }, [chapterId])
+  ]))
+  if (lessonTitle !== null && lessonTitle !== "") {
+    let ts = String(lessonTitle)
+    if (ts.length > 0) {
+      parts.push(h("h1", { className: "ll-lesson-title" }, [ts]))
+    }
+  }
+  parts.push(h("div", { className: "ll-lesson-actions" }, [
+    h("button", {
+      type: "button",
+      className: "ll-mark-done ll-mark-done-static",
+      disabled: true,
+      title: "Available when the app finishes loading"
+    }, ["Mark complete"])
+  ]))
+  return h("div", { className: "ll-lesson-header" }, parts)
+}
+
+export fn chapterMainShellVnode(trackId, chapterId, lessonTitle, articleInnerHtml) {
+  return h("main", { className: "ll-main" }, [
+    h("article", { className: "ll-lesson" }, [
+      lessonHeaderShellVnode(trackId, chapterId, lessonTitle),
+      h("div", { className: "ll-lesson-body" }, [
+        h("div", { className: "ll-md", dangerouslySetInnerHTML: { __html: articleInnerHtml } }, [])
+      ])
+    ])
+  ])
+}
+
+export fn chapterPageAppVnode(trackId, chapterId, lessonTitle, articleInnerHtml, manifest) {
+  return h("div", { className: "ll-app" }, [
+    siteHeaderVnode(trackId),
+    h("div", { className: "ll-body" }, [
+      h("aside", { className: "ll-sidebar" }, [sidebarTreeVnode(manifest, trackId, chapterId)]),
+      chapterMainShellVnode(trackId, chapterId, lessonTitle, articleInnerHtml)
+    ])
+  ])
+}

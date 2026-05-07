@@ -1,0 +1,16 @@
+// Shared HTML escaping for SSG and any string → attribute / text serialization.
+
+export fn escapeHtmlText(s) {
+  if (s === null) { return "" }
+  let t = String(s)
+  t = t.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;")
+  return t
+}
+
+// Attribute values: escape quotes and ampersands for double-quoted attrs.
+export fn escapeHtmlAttr(s) {
+  if (s === null) { return "" }
+  let t = String(s)
+  t = t.split("&").join("&amp;").split("\"").join("&quot;").split("<").join("&lt;")
+  return t
+}

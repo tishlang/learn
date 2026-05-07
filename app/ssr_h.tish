@@ -1,0 +1,29 @@
+// Minimal `h` / `Fragment` for static HTML generation under `tish run`.
+// The real `lattish` package uses `Symbol` for Fragment, which the Tish VM
+// used by `tish run` does not provide — so prerender cannot import Lattish.
+// Vnode shape matches Lattish string-tag nodes: { tag, props, children, _el }.
+
+export let Fragment = "__SSR_FRAGMENT__"
+
+// Named `ssrH` (not `h`) so `tish run` does not bind the host JSX `h` helper instead.
+export fn ssrH(tag, props, children) {
+  if (children === null) {
+    children = []
+  }
+  // Do not test `=== undefined` here — Tish VM parse can break the rest of this `fn` body.
+  if (!Array.isArray(children)) {
+    children = [children]
+  }
+  if (typeof tag === "function") {
+    return ({
+      tag: "span",
+      props: { className: "ll-ssr-unsupported" },
+      children: ["[prerender: function components are not supported in SSG]"],
+      _el: null
+    })
+  }
+  if (tag === Fragment) {
+    return ({ tag: Fragment, props: null, children: children, _el: null })
+  }
+  return ({ tag: tag, props: props || null, children: children, _el: null })
+}

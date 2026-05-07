@@ -8,73 +8,12 @@ import { readFile, writeFile, readDir, mkdir, fileExists, isDir } from "fs"
 import { parseDocument, splitFrontmatter } from "./app/tishdoc.tish"
 import { parsedToPrerenderArticleHtml } from "./app/prerender_article.tish"
 import { isFileError, opt } from "./app/utils/objects.tish"
+import { escapeHtmlText } from "./app/html_escape.tish"
+import { vnodeToHtml } from "./app/ssr_vnode.tish"
+import { chapterPageAppVnode } from "./app/prerender_shell.tish"
 
-fn escapeHtmlText(s) {
-  if (s === null) { return "" }
-  let t = String(s)
-  t = t.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;")
-  return t
-}
-
-fn lessonTitleHtml(lessonTitle) {
-  if (lessonTitle === null || lessonTitle === "") { return "" }
-  let s = String(lessonTitle)
-  if (s.length === 0) { return "" }
-  return "    <h1 class=\"ll-lesson-title\">" + escapeHtmlText(s) + "</h1>\n"
-}
-
-// Must match LearnApp.tish `TRACKS` (id, title, emoji) for static header parity.
-const PRERENDER_TRACKS = [
-  { id: "beginner", title: "Learn to code", emoji: "★" },
-  { id: "tish-deep", title: "Tish, in depth", emoji: "▣" },
-  { id: "modules", title: "Modules", emoji: "◇" },
-  { id: "capstones", title: "Capstones", emoji: "▲" }
-]
-
-fn isSubChapterPrerender(id) {
-  if (id === null || id === "") { return false }
-  let i = 0
-  while (i < id.length && id.charAt(i) >= "0" && id.charAt(i) <= "9") {
-    i = i + 1
-  }
-  if (i === 0) { return false }
-  if (i + 1 >= id.length) { return false }
-  let c = id.charAt(i)
-  let isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
-  if (!isLetter) { return false }
-  return id.charAt(i + 1) === "-"
-}
-
-fn buildStaticHeaderHtml(activeTrackId) {
-  let brand = "    <a href=\"/\" class=\"ll-brand\">"
-    + "<span class=\"ll-brand-emoji\">⌬</span>"
-    + "<span class=\"ll-brand-text\">tish-learn</span></a>\n"
-  let navOpen = "    <nav class=\"ll-tracks\">\n"
-  let navBody = ""
-  let ti = 0
-  while (ti < PRERENDER_TRACKS.length) {
-    let t = PRERENDER_TRACKS[ti]
-    let active = t.id === activeTrackId
-    let cls = active ? "ll-track-btn ll-track-btn-active" : "ll-track-btn"
-    navBody = navBody + "      <a href=\"/" + t.id + "\" class=\"" + cls + "\">"
-      + "<span class=\"ll-track-emoji\">" + t.emoji + "</span>"
-      + "<span class=\"ll-track-title\">" + escapeHtmlText(t.title) + "</span></a>\n"
-    ti = ti + 1
-  }
-  let navClose = "    </nav>\n"
-  let theme = "    <div class=\"ll-header-right\">"
-    + "<span class=\"ll-theme-toggle ll-theme-toggle-static\" aria-hidden=\"true\">"
-    + "<span class=\"ll-theme-icon\">◐</span>"
-    + "<span class=\"ll-theme-label\">System</span></span></div>\n"
-  return "  <header class=\"ll-header\">\n" + brand + navOpen + navBody + navClose + theme + "  </header>\n"
-}
-
-async fn buildSidebarHtml(contentDir, trackId, chapterId) {
-  let path = contentDir + "/tracks/" + trackId + ".json"
-  let raw = await readFile(path)
-  if (isFileError(raw)) {
-    return "<div class=\"ll-sidebar-empty\">Chapters</div>"
-  }
+fn parseTrackManifestRaw(raw) {
+  if (isFileError(raw)) { return null }
   let s = typeof raw === "string" ? raw : String(raw)
   let manifest = null
   try {
@@ -82,70 +21,16 @@ async fn buildSidebarHtml(contentDir, trackId, chapterId) {
   } catch (e) {
     manifest = null
   }
-  if (manifest === null || typeof manifest !== "object") {
-    return "<div class=\"ll-sidebar-empty\">Chapters</div>"
-  }
-  let parts = opt(manifest, "parts", [])
-  let out = "<div class=\"ll-sidebar-tree\">"
-  let p = 0
-  while (p < parts.length) {
-    let part = parts[p]
-    let ptitle = opt(part, "title", "Part " + String(p + 1))
-    let chapters = opt(part, "chapters", [])
-    out = out + "<div class=\"ll-sidebar-group\">"
-    out = out + "<div class=\"ll-sidebar-group-title\">" + escapeHtmlText(ptitle) + "</div>"
-    out = out + "<div class=\"ll-sidebar-group-list\">"
-    let i = 0
-    while (i < chapters.length) {
-      let c = chapters[i]
-      let cid = opt(c, "id", "")
-      let ctitle = opt(c, "title", cid)
-      let href = "/" + trackId + "/" + cid
-      let cls = "ll-chap"
-      if (isSubChapterPrerender(cid)) { cls = cls + " ll-chap-nested" }
-      if (cid === chapterId) { cls = cls + " ll-chap-current" }
-      let stepCls = "ll-sidebar-step"
-      if (isSubChapterPrerender(cid)) { stepCls = stepCls + " ll-sidebar-step-nested" }
-      let nodeCls = "ll-road-node"
-      if (cid === chapterId) { nodeCls = nodeCls + " ll-road-node-current" }
-      out = out + "<div class=\"" + stepCls + "\"><span class=\"" + nodeCls + "\" aria-hidden=\"true\"></span>"
-        + "<a class=\"" + cls + "\" href=\"" + escapeHtmlText(href) + "\">"
-        + escapeHtmlText(ctitle) + "</a></div>"
-      i = i + 1
-    }
-    out = out + "</div></div>"
-    p = p + 1
-  }
-  out = out + "</div>"
-  return out
+  if (manifest === null || typeof manifest !== "object") { return null }
+  return manifest
 }
 
 async fn buildChapterPrerenderShellHtml(contentDir, trackId, chapterId, lessonTitle, articleInner) {
-  let header = buildStaticHeaderHtml(trackId)
-  let sidebarInner = await buildSidebarHtml(contentDir, trackId, chapterId)
-  let backHref = "/" + trackId
-  let backLabel = "← " + escapeHtmlText(trackId)
-  let chapEsc = escapeHtmlText(chapterId)
-  let lh1 = "    <div class=\"ll-lesson-header\">\n"
-  let lh2 = lh1 + "      <div class=\"ll-lesson-trail\">\n"
-  let lh3 = lh2 + "        <a class=\"ll-lesson-back\" href=\"" + escapeHtmlText(backHref) + "\">" + backLabel + "</a>\n"
-  let lh4 = lh3 + "        <span class=\"ll-lesson-chapter\">" + chapEsc + "</span>\n"
-  let lh5 = lh4 + "      </div>\n"
-  let lh6 = lh5 + lessonTitleHtml(lessonTitle)
-  let lh7 = lh6 + "      <div class=\"ll-lesson-actions\">\n"
-  let lh8 = lh7 + "        <button type=\"button\" class=\"ll-mark-done ll-mark-done-static\" disabled title=\"Available when the app finishes loading\">Mark complete</button>\n"
-  let lessonHead = lh8 + "      </div>\n" + "    </div>\n"
-  let mainOpen = "    <main class=\"ll-main\"><article class=\"ll-lesson\">\n"
-  let mainBodyOpen = "    <div class=\"ll-lesson-body\"><div class=\"ll-md\">"
-  let mainClose = "</div></div></article></main>\n"
-  let mainCol = mainOpen + lessonHead + mainBodyOpen + articleInner + mainClose
-  let sh1 = "  <div class=\"ll-app\">\n"
-  let sh2 = sh1 + header
-  let sh3 = sh2 + "  <div class=\"ll-body\">\n"
-  let sh4 = sh3 + "    <aside class=\"ll-sidebar\">" + sidebarInner + "</aside>\n"
-  let sh5 = sh4 + mainCol
-  let sh6 = sh5 + "  </div>\n"
-  return sh6 + "  </div>\n"
+  let path = contentDir + "/tracks/" + trackId + ".json"
+  let raw = await readFile(path)
+  let manifest = parseTrackManifestRaw(raw)
+  let root = chapterPageAppVnode(trackId, chapterId, lessonTitle, articleInner, manifest)
+  return vnodeToHtml(root)
 }
 
 // First JSON string after `:` on a line like `"contentDir": "content",`
