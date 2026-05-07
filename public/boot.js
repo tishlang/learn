@@ -3,6 +3,20 @@
  * Prerendered pages include <meta name="ll-defer-wasm" content="1"/> so heavy
  * work starts after idle or first interaction.
  */
+// Prerendered lessons are often requested as .../chapter/ (trailing slash).
+// The SPA router reads `location.pathname` on first paint; a tail like
+// `beginner/05-numbers/` becomes chapter `05-numbers/` and fetches
+// `/content/beginner/05-numbers/.tishdoc.md` (404). Canonicalize before any
+// `import()` of learn.js so pathname matches `/chapter` links (also helps
+// browsers that still have an older cached learn.js).
+;(function canonicalizeLessonPathname() {
+  if (typeof history === "undefined" || typeof location === "undefined") return
+  const p = location.pathname
+  if (p.length <= 1 || !/\/+$/.test(p)) return
+  const tail = location.search + location.hash
+  history.replaceState(history.state, "", p.replace(/\/+$/, "") + tail)
+})()
+
 window.__tishDecodeB64 = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
 
 const path = (location.pathname.replace(/\/$/, "") || "/")

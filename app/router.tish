@@ -11,10 +11,43 @@
 
 import { useState, useLayoutEffect } from "lattish"
 
+// Strip slashes from both ends (track ids are single segments like "beginner").
+export fn normalizeTrackSegment(trackId) {
+  if (trackId === null || trackId === undefined) { return "" }
+  let t = String(trackId)
+  while (t.length > 0 && t.charAt(0) === "/") { t = t.substring(1) }
+  while (t.length > 0 && t.charAt(t.length - 1) === "/") { t = t.substring(0, t.length - 1) }
+  return t
+}
+
+// Canonical chapter slug for manifest + /content/... paths. Handles:
+// - trailing slashes (…/05-numbers/ → 05-numbers)
+// - directory index URLs (…/05-numbers/index.html → 05-numbers)
+// - stray slashes at the start of the tail segment
+export fn normalizeChapterSegment(chapter) {
+  if (chapter === null || chapter === undefined) { return "" }
+  let c = String(chapter)
+  while (c.length > 0 && c.charAt(0) === "/") { c = c.substring(1) }
+  while (c.length > 0 && c.charAt(c.length - 1) === "/") { c = c.substring(0, c.length - 1) }
+  let suf = "/index.html"
+  while (c.length >= suf.length && c.substring(c.length - suf.length) === suf) {
+    c = c.substring(0, c.length - suf.length)
+    while (c.length > 0 && c.charAt(c.length - 1) === "/") { c = c.substring(0, c.length - 1) }
+  }
+  if (c === "index.html") { return "" }
+  return c
+}
+
 export fn parsePath(pathname) {
   let p = pathname
   if (p === null || p === undefined) { p = "/" }
-  if (p.length > 0 && p.charAt(0) === "/") { p = p.substring(1) }
+  while (p.length > 0 && p.charAt(0) === "/") { p = p.substring(1) }
+  // Static hosts often serve chapter pages as .../chapter/ or .../chapter/index.html.
+  // Without trimming, `chapter` becomes `01-hello/` or `05-numbers/index.html` and
+  // chapterUrl misses the prerender bootstrap and 404s on fetch.
+  while (p.length > 0 && p.charAt(p.length - 1) === "/") {
+    p = p.substring(0, p.length - 1)
+  }
   if (p.length === 0) { return { view: "home", track: null, chapter: null } }
   // /sandbox — full-screen popup mount of SandboxIde from tish-ide-panels.
   // Reserved word; "sandbox" is not a curriculum track id.
@@ -24,10 +57,10 @@ export fn parsePath(pathname) {
     return { view: "sandbox", track: null, chapter: null }
   }
   if (firstSlash < 0) {
-    return { view: "track", track: p, chapter: null }
+    return { view: "track", track: normalizeTrackSegment(p), chapter: null }
   }
-  let track = p.substring(0, firstSlash)
-  let chapter = p.substring(firstSlash + 1)
+  let track = normalizeTrackSegment(p.substring(0, firstSlash))
+  let chapter = normalizeChapterSegment(p.substring(firstSlash + 1))
   if (chapter.length === 0) {
     return { view: "track", track: track, chapter: null }
   }

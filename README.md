@@ -10,9 +10,7 @@ A 100%-Tish, in-browser **learn-to-code** platform. Forty beginner chapters, twe
 
 The **in-browser** stack is **pure Tish** (Lattish + panels + tailwind emitter + browser-server). There is no React, Webpack, or Tailwind CLI.
 
-For **authoring / packaging ergonomics** we add a small **tooling-only** dependency:
-
-- **`@tishlang/learn-site`** — `learn dev` / `learn build` CLI (`npm run dev` / `npm run build`).
+**`npm run dev` / `npm run build`** are thin wrappers around **`just dev`** and **`just build`** (see [`justfile`](justfile)); you can call `just` directly if you prefer.
 
 **`public/boot.js`** is plain ESM (not compiled Tish): it loads wasm + `import()` of `learn.js` vs `learn_sandbox.js`, and can **defer** heavy work when prerendered pages set `<meta name="ll-defer-wasm" content="1">`.
 
@@ -39,10 +37,10 @@ Each capstone closes with a **"Take it real"** appendix showing the one-line dif
 Prereqs: [Rust](https://rustup.rs) + [`just`](https://github.com/casey/just) + [`wasm-bindgen-cli`](https://rustwasm.github.io/wasm-bindgen/reference/cli.html), and a sibling checkout of [`tish`](https://github.com/tishlang/tish) (default `../tish`, override with `TISH_ROOT`).
 
 ```bash
-npm install      # one-time: file: deps + @tishlang/learn-site
-npm run dev      # → learn dev → tish dev-server.tish (:8765)
-npm run build    # → learn build → just build (includes prerender + sandbox split)
-just dev         # same as npm run dev if learn is on PATH via npm scripts
+npm install      # one-time: sibling packages (lattish, panels, tailwind, browser-server)
+npm run dev      # → just dev → full build + dev-server.tish (:8765)
+npm run build    # → just build (includes prerender + sandbox split)
+just dev         # same as npm run dev
 ```
 
 Targets:
@@ -61,7 +59,7 @@ Targets:
 | `just quick` | App + sandbox + CSS + prerender (skips Rust builds) |
 | `just dev` | `just build` + serve via `dev-server.tish` |
 
-**`learn.config.json`** at the repo root configures `contentDir` / `outDir` for prerender (see `packages/learn-site/docs/PUBLIC_API.md`).
+**`learn.config.json`** at the repo root configures `contentDir`, `tracksDir`, `outDir`, and `basePath` for [`prerender.tish`](prerender.tish) (reserved fields documented in that file’s comments if needed).
 
 ## Layout
 

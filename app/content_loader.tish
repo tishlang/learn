@@ -2,6 +2,7 @@
 // Surfaces { state: "idle"|"loading"|"ready"|"error", text?, error? }.
 
 import { useState, useLayoutEffect } from "lattish"
+import { normalizeChapterSegment, normalizeTrackSegment } from "./router.tish"
 
 let cache = {}
 
@@ -151,10 +152,13 @@ export fn useJsonResource(path) {
 
 // Convenience: build the URL of a track manifest or chapter file.
 export fn trackManifestUrl(trackId) {
-  return "/content/tracks/" + trackId + ".json"
+  let tid = normalizeTrackSegment(trackId)
+  return "/content/tracks/" + tid + ".json"
 }
 
 export fn chapterUrl(trackId, chapterId) {
   // Capstones use sub-paths like "chat/01-client-ui"; treat them transparently.
-  return "/content/" + trackId + "/" + chapterId + ".tishdoc.md"
+  let tid = normalizeTrackSegment(trackId)
+  let cid = normalizeChapterSegment(chapterId)
+  return "/content/" + tid + "/" + cid + ".tishdoc.md"
 }

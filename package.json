@@ -7,12 +7,11 @@
   "type": "module",
   "scripts": {
     "build:css": "tish run --feature fs --feature http build-css.tish",
-    "dev": "learn dev",
-    "build": "learn build",
+    "dev": "just dev",
+    "build": "just build",
     "build:legacy": "tish run --feature fs --feature http --feature process dev-server.tish"
   },
   "dependencies": {
-    "@tishlang/learn-site": "file:../packages/learn-site",
     "lattish": "../lattish",
     "tish-ide-panels": "../tish-ide-panels",
     "tish-tailwind": "../tish-tailwind",
