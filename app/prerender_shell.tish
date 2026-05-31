@@ -1,6 +1,5 @@
 // Static shell for SSG: same DOM shape as LearnApp / LessonView chrome, built with
-// `ssrH` from ssr_h.tish (vnode-compatible with Lattish), serialized via ssr_vnode.tish.
-// `tish run` cannot import the real `lattish` package (it uses `Symbol` for Fragment).
+// `ssrH` (Lattish-compatible vnodes); see ssr_h.tish. Serialized via ssr_vnode.tish.
 
 import { ssrH as h } from "./ssr_h.tish"
 import { opt } from "./utils/objects.tish"

@@ -45,6 +45,12 @@
 .transform { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); }
 .hover\:scale-110:hover { --tw-scale-x: 1.1; --tw-scale-y: 1.1; }
 .group:hover .group-hover\:brightness-150 { filter: brightness(1.5); }
+.block { display: block; }
+.fixed { position: fixed; }
+.p-2 { padding: 0.5rem; }
+.rounded-l { border-top-left-radius: 0.25rem; border-bottom-left-radius: 0.25rem; }
+.shadow { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
+.sticky { position: sticky; }
 
 :root, .theme-light, .theme-dark {
   --background: var(--bg);

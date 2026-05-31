@@ -1,7 +1,7 @@
 // Minimal `h` / `Fragment` for static HTML generation under `tish run`.
-// The real `lattish` package uses `Symbol` for Fragment, which the Tish VM
-// used by `tish run` does not provide — so prerender cannot import Lattish.
-// Vnode shape matches Lattish string-tag nodes: { tag, props, children, _el }.
+// Prefer `import { h, Fragment } from "lattish"` once your Tish CLI parses
+// `node_modules/lattish/src/Lattish.tish` (needs `Symbol` in the VM — recent Tish).
+// Until then, this mirrors Lattish string-tag / Fragment vnode shape for `vnodeToHtml`.
 
 export let Fragment = "__SSR_FRAGMENT__"
 
