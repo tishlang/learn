@@ -5,7 +5,7 @@
 // :::
 // Body uses a mini key:value subset to declare prompt + options + answer.
 
-import { useState } from "lattish"
+import { useState } from "@tishlang/lattish"
 import { setItem, getItem } from "../progress.tish"
 import { opt } from "../utils/objects.tish"
 import { InlineMd } from "../InlineMd.tish"

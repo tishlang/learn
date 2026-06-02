@@ -1,5 +1,5 @@
 // Minimal `h` / `Fragment` for static HTML generation under `tish run`.
-// Prefer `import { h, Fragment } from "lattish"` once your Tish CLI parses
+// Prefer `import { h, Fragment } from "@tishlang/lattish"` once your Tish CLI parses
 // `node_modules/lattish/src/Lattish.tish` (needs `Symbol` in the VM — recent Tish).
 // Until then, this mirrors Lattish string-tag / Fragment vnode shape for `vnodeToHtml`.
 

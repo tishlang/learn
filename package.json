@@ -9,12 +9,15 @@
     "build:css": "tish run --feature fs --feature http build-css.tish",
     "dev": "just dev",
     "build": "just build",
-    "build:legacy": "tish run --feature fs --feature http --feature process dev-server.tish"
+    "build:legacy": "tish run --feature fs --feature http --feature process dev-server.tish",
+    "link-local": "npm link ../lattish ../tish-ide-panels ../tish-tailwind ../tish-browser-server",
+    "unlink-local": "npm install",
+    "vercel-build": "echo 'Skipping build on Vercel, artifacts are already committed'"
   },
   "dependencies": {
-    "lattish": "../lattish",
-    "tish-ide-panels": "../tish-ide-panels",
-    "tish-tailwind": "../tish-tailwind",
-    "tish-browser-server": "../tish-browser-server"
+    "@tishlang/lattish": "latest",
+    "@tishlang/tish-ide-panels": "latest",
+    "@tishlang/tish-tailwind": "latest",
+    "@tishlang/tish-browser-server": "latest"
   }
 }

@@ -4,7 +4,7 @@
 //   - a live Tish component (for ::pick / ::tryit / :::exercise / :::quiz /
 //     :::sandbox / :::callout / :::project)
 
-import { useRef, useLayoutEffect } from "lattish"
+import { useRef, useLayoutEffect } from "@tishlang/lattish"
 import { parseDocument, blockToHtml } from "../tishdoc.tish"
 import { navigate, buildPath } from "../router.tish"
 import { isComplete, markComplete, markIncomplete } from "../progress.tish"

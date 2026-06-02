@@ -1,7 +1,7 @@
 // Per-user progress: completion state per chapter + per directive (quiz, exercise).
 // Stored in localStorage as JSON.
 
-import { useState, useEffect } from "lattish"
+import { useState, useEffect } from "@tishlang/lattish"
 import { omit } from "./utils/objects.tish"
 
 const STORAGE_KEY = "tish-learn-progress"

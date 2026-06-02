@@ -1,7 +1,7 @@
 // :::callout{kind=info|tip|warn|danger|note title=...}
 //   Body markdown rendered into the callout box.
 
-import { useRef, useLayoutEffect } from "lattish"
+import { useRef, useLayoutEffect } from "@tishlang/lattish"
 import { opt } from "../utils/objects.tish"
 import { InlineMd } from "../InlineMd.tish"
 

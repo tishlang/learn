@@ -1,7 +1,7 @@
 // Fetches lesson markdown + track manifests from /content/, caches in-memory.
 // Surfaces { state: "idle"|"loading"|"ready"|"error", text?, error? }.
 
-import { useState, useLayoutEffect } from "lattish"
+import { useState, useLayoutEffect } from "@tishlang/lattish"
 import { normalizeChapterSegment, normalizeTrackSegment } from "./router.tish"
 
 let cache = {}

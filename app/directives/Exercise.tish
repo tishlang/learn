@@ -3,7 +3,7 @@
 // :::
 // Wraps MiniRunner with expected output. On pass, marks complete in progress.
 
-import { MiniRunner } from "tish-ide-panels"
+import { MiniRunner } from "@tishlang/tish-ide-panels"
 import { markComplete, setItem } from "../progress.tish"
 import { opt } from "../utils/objects.tish"
 

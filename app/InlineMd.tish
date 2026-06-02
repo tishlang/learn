@@ -6,7 +6,7 @@
 // The `tag` prop lets the caller pick a different element (e.g. "p" for the
 // Project summary) so semantic markup is preserved.
 
-import { useRef, useLayoutEffect } from "lattish"
+import { useRef, useLayoutEffect } from "@tishlang/lattish"
 import { renderInline } from "./tishdoc.tish"
 
 export fn InlineMd(props) {

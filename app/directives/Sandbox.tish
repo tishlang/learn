@@ -12,7 +12,7 @@
 // body syntax (`---FILE: name---`) and namespacing the per-sandbox layout
 // store under the directive `id`.
 
-import { SandboxIde } from "tish-ide-panels"
+import { SandboxIde } from "@tishlang/tish-ide-panels"
 import { opt } from "../utils/objects.tish"
 
 const FILE_SPLIT = "---FILE:"

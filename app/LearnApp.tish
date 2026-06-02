@@ -1,7 +1,7 @@
 // Top-level shell: header, sidebar with track + chapter list, content area.
 // Routes #/, #/<track>, #/<track>/<chapter>.
 
-import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
+import { useState, useRef, useLayoutEffect, useMemo } from "@tishlang/lattish"
 import { useRoute, navigate, navigateRaw } from "./router.tish"
 import { useJsonResource, useTextResource, chapterUrl, trackManifestUrl } from "./content_loader.tish"
 import { completedChapters, useProgressVersion } from "./progress.tish"

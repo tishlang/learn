@@ -30,8 +30,8 @@
 // Chips render with TishHighlight token classes for color, so syntax categories
 // click subconsciously without anyone having to teach "this is a string."
 
-import { useState, useRef, useLayoutEffect, useMemo } from "lattish"
-import { runVm, highlightToHtml } from "tish-ide-panels"
+import { useState, useRef, useLayoutEffect, useMemo } from "@tishlang/lattish"
+import { runVm, highlightToHtml } from "@tishlang/tish-ide-panels"
 import { opt } from "../utils/objects.tish"
 
 fn normalizeOut(s) {

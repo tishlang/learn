@@ -9,7 +9,7 @@
 // Requires the dev/static server to do SPA fallback (serve index.html for
 // any unknown path that isn't an asset or under /content/).
 
-import { useState, useLayoutEffect } from "lattish"
+import { useState, useLayoutEffect } from "@tishlang/lattish"
 
 // Strip slashes from both ends (track ids are single segments like "beginner").
 export fn normalizeTrackSegment(trackId) {

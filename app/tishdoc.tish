@@ -49,7 +49,7 @@
 // Deep file import (not `tish-ide-panels` barrel): the package entry pulls
 // SandboxIde and the whole IDE graph, which breaks `tish run` prerender and
 // bloats the learn bundle. The resolver does not yet honor `exports` subpaths.
-import { highlightToHtml } from "../node_modules/tish-ide-panels/src/highlight/TishHighlight.tish"
+import { highlightToHtml } from "../node_modules/@tishlang/tish-ide-panels/src/highlight/TishHighlight.tish"
 
 fn isWs(c) {
   return c === " " || c === "\t" || c === "\r" || c === "\n"

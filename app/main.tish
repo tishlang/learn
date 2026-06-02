@@ -3,7 +3,7 @@
 // dist/learn.js), so by the time this module runs the compile/run helpers
 // from tish-ide-panels are available.
 
-import { createRoot } from "lattish"
+import { createRoot } from "@tishlang/lattish"
 import { LearnApp } from "./LearnApp.tish"
 
 const root = document.getElementById("app")

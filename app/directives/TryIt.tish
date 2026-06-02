@@ -1,7 +1,7 @@
 // ::tryit{code="..."} or :::tryit ... :::
 // Wraps MiniRunner with expected=null so it just shows captured output.
 
-import { MiniRunner } from "tish-ide-panels"
+import { MiniRunner } from "@tishlang/tish-ide-panels"
 import { opt } from "../utils/objects.tish"
 
 export fn TryIt(props) {

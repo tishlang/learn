@@ -8,7 +8,7 @@
 // Output: public/utilities.css (linked from public/index.html)
 // Run: tish run --feature fs --feature http build-css.tish
 
-import { fullStylesheet } from "tish-tailwind"
+import { fullStylesheet } from "@tishlang/tish-tailwind"
 import { readDir, readFile, writeFile } from "fs"
 
 fn isFileError(v) {
@@ -54,7 +54,7 @@ console.log("scanning " + String(sources.length) + " source files for utility cl
 // component-scoped rules (`.pg-*`, `.hl-*`, `.scrollbar-thin`) are what we
 // actually need; everything before `.pg-root` is the package's standalone
 // dark theme + reset and doesn't belong in the lesson site.
-let panelsCss = await tryRead("node_modules/tish-ide-panels/src/panels.css")
+let panelsCss = await tryRead("node_modules/@tishlang/tish-ide-panels/src/panels.css")
 if (panelsCss === null) { panelsCss = "" }
 let firstScopedRule = panelsCss.indexOf(".pg-root")
 if (firstScopedRule > 0) { panelsCss = panelsCss.substring(firstScopedRule) }

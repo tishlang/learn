@@ -20,7 +20,7 @@ default:
 # that gets prepended to compiled lesson code in the srcdoc iframe.
 build-runtime:
     mkdir -p "{{ justfile_directory() }}/public/dist"
-    tish build "{{ justfile_directory() }}/node_modules/tish-ide-panels/src/iframe-runtime.tish" \
+    tish build "{{ justfile_directory() }}/node_modules/@tishlang/tish-ide-panels/src/iframe-runtime.tish" \
         -o "{{ justfile_directory() }}/public/dist/lattish-runtime.js" \
         --target js
 
@@ -34,7 +34,7 @@ build-app: build-runtime build-sandbox
 # Compile the Service Worker source -> public/dist/tish-sw.js
 build-sw:
     mkdir -p "{{ justfile_directory() }}/public/dist"
-    tish build "{{ justfile_directory() }}/node_modules/tish-browser-server/src/sw_worker.tish" \
+    tish build "{{ justfile_directory() }}/node_modules/@tishlang/tish-browser-server/src/sw_worker.tish" \
         -o "{{ justfile_directory() }}/public/dist/tish-sw.js" \
         --target js
 

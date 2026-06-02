@@ -3,7 +3,7 @@
 // :::
 // Capstone hero card.
 
-import { useRef, useLayoutEffect } from "lattish"
+import { useRef, useLayoutEffect } from "@tishlang/lattish"
 import { opt } from "../utils/objects.tish"
 import { InlineMd } from "../InlineMd.tish"
 

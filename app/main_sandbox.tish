@@ -1,6 +1,6 @@
 // Standalone sandbox entry — smaller than full LearnApp (no lesson chrome).
-import { createRoot } from "lattish"
-import { StandalonePage } from "tish-ide-panels"
+import { createRoot } from "@tishlang/lattish"
+import { StandalonePage } from "@tishlang/tish-ide-panels"
 
 const root = document.getElementById("app")
 createRoot(root).render(
