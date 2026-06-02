@@ -4,7 +4,13 @@ set -e
 echo "=> Setting up Vercel build environment for tish-learn..."
 
 # Ensure we use the locally installed tish and just
-export PATH="$PWD/node_modules/.bin:$PATH"
+export PATH="$PWD/node_modules/.bin:$PWD/bin:$PATH"
+
+if ! command -v just &> /dev/null; then
+    echo "=> Installing 'just'..."
+    mkdir -p ./bin
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ./bin
+fi
 
 # Setup Rust and wasm-bindgen if not present
 if ! command -v rustc &> /dev/null; then

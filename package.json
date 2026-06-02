@@ -21,7 +21,6 @@
     "@tishlang/tish-browser-server": "latest"
   },
   "devDependencies": {
-    "@tishlang/tish": "latest",
-    "extra-just": "latest"
+    "@tishlang/tish": "latest"
   }
 }
