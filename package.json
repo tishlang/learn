@@ -2,7 +2,7 @@
   "name": "tish-learn",
   "version": "0.1.0",
   "description": "Learn to code with Tish — fully featured education platform. 100% Tish, zero JS deps, zero backend.",
-  "license": "PIF",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
