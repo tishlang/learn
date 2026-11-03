@@ -16,11 +16,11 @@
   },
   "dependencies": {
     "@tishlang/lattish": "latest",
-    "@tishlang/tish-ide-panels": "latest",
+    "@tishlang/tish-ide-panels": "2.0.1",
     "@tishlang/tish-tailwind": "latest",
     "@tishlang/tish-browser-server": "latest"
   },
   "devDependencies": {
-    "@tishlang/tish": "latest"
+    "@tishlang/tish": "4.2.4"
   }
 }
